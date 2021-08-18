@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vanend
+  namespace: apps
+  labels:
+    app: vanend
+spec:
+  selector:
+    matchLabels:
+      app: vanend
+  template: #ini untuk sklian dengan pod juga
+    metadata:
+      namespace: app-backend
+      labels:
+        app: vanend
+    spec:
+      containers:
+        - name: vanend
+          resources:
+            requests:
+              memory: "80Mi"
+              cpu: "8m"
+            limits:
+              memory: "400Mi"
+              cpu: "40"
+          image: vanilla-dashboard:v0.0.1-alpha-4
+          command: ["/bin/bash"]
+          args: [-c, "env-gen & ./vanend"]
+          ports:
+            - containerPort: 6012
+          env:
+            - name: LOG_LEVEL
+              value: debug
+            - name: PASSWORD
+              value: valdmir
+            - name: HOST
+              value: 192.168.43.127
+            - name: DATABASE_URL
+              value: postgres://valdmir:$(PASSWORD)@$(HOST):30000/gridlite?sslmode=disable
+            - name: PORT
+              value: "6012"
+            - name: KEYSPACE
+              value: "some-keyspace"
+            - name: FREMIS_URL
+              value: http://192.168.103.91:4005/v1/face
+            - name: GRIDLITE_WEBSOCKET_URL
+              value: ws://192.168.103.91:4004/event_channel
+            - name: ENV_DEST
+              value: /
+            - name: REACT_APP_HOST
+              value: http://localhost:30005
+            - name: REACT_APP_API_CAMERA
+              value: http://localhost:30005
+            - name: REACT_APP_API_ENROLLMENT
+              value: http://localhost:30005/api
+            - name: REACT_APP_API_WEB_SOCKET
+              value: http://localhost:30005/api
+            - name: NODE_ENV
+              value: production
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  # Unique key of the Service instance
+  name: vanend
+  namespace: apps
+spec:
+  type: NodePort
+  ports:
+    # Accept traffic sent to port 80
+    - name: http
+      port: 6012
+      targetPort: 6012
+      nodePort: 30005
+
+  selector:
+    # Loadbalance traffic across Pods matching
+    # this label selector
+    app: vanend

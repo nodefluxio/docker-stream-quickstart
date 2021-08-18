@@ -1,0 +1,16 @@
+:local(.container){
+  height: 100%;
+  width: 100%;  
+  // background-color: black;
+  // opacity: 0.2;
+  &> .container_spinner{
+
+  position: relative;
+    &>p{
+      position: absolute;
+      top:90px;
+      left:85px;
+      font-size: 20px;
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "parser": "babel-eslint",
+  "extends": [
+    "airbnb-base",
+    "prettier",
+    "prettier/react",
+    "plugin:react/recommended",
+    "plugin:import/errors",
+    "plugin:import/warnings",
+    "eslint:recommended"
+  ],
+  "ignorePatterns": ["src/assets/js/*.js  "],
+  "settings": {
+    "import/resolver": {
+      "babel-module": {},
+      "node": {
+        "paths": ["src"]
+      }
+    },
+    "react": {
+      "pragma": "React",
+      "version": "detect"
+    }
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "jest": true
+  },
+  "plugins": ["react", "prettier", "import"],
+  "parserOptions": {
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "rules": {
+    "prettier/prettier": "error",
+    "class-methods-use-this": [
+      "error",
+      {
+        "exceptMethods": [
+          "render",
+          "getInitialState",
+          "getDefaultProps",
+          "getChildContext",
+          "UNSAFE_componentWillMount",
+          "componentDidMount",
+          "componentWillReceiveProps",
+          "shouldComponentUpdate",
+          "componentWillUpdate",
+          "componentDidUpdate",
+          "componentWillUnmount"
+        ]
+      }
+    ],
+    "react/no-unescaped-entities": ["error", { "forbid": [">", "}"] }],
+    "react/prop-types": [2, { "skipUndeclared": false } ],
+    "import/prefer-default-export": ["off"],
+    "no-console": 2
+  }
+}

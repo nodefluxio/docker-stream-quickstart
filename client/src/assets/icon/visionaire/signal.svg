@@ -1,0 +1,28 @@
+
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M13 15H14C14.5523 15 15 14.5523 15 14V2C15 1.44772 14.5523 1 14 1H2C1.44772 1 1 1.44772 1 2V3"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M6 15C6 12.2386 3.76142 10 1 10"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M10 15C10 10.0294 5.97056 6 1 6"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <circle cx="1.36" cy="14.64" r="1.36" fill="white" />
+            </svg>

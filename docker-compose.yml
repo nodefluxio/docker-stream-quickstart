@@ -1,0 +1,24 @@
+version: "3"
+services:
+  vanilla-dasboard:
+    container_name: vanilla-dashboard
+    image: registry.gitlab.com/nodefluxio/core-stream/vanilla-dashboard:v0.5.1-alpha1
+    command: /bin/bash -c "./dbmate -d /opt/database migrate && env-gen && ./vanend"
+    ports:
+      - 80:80
+    environment:
+    - NODE_ENV=production
+    - LOG_LEVEL=info
+    - DATABASE_URL=postgres://postgres:test@192.168.103.94:5432/postgres?sslmode=disable
+    - KEYSPACE=some-keyspace
+    - FREMIS_URL=http://192.168.103.94:4005/v1/face
+    - GRIDLITE_WEBSOCKET_URL=ws://192.168.103.94:4004/event_channel
+    - GRIDLITE_HTTP_URL=http://192.168.103.94:4004
+    - CRONJOB_PARTITION_SPEC=0 0 * * *
+    - ENV_DEST=/
+    - REACT_APP_HOST=http://192.168.103.94
+    - REACT_APP_API_CAMERA=http://192.168.103.94:4004
+    - REACT_APP_API_ENROLLMENT=http://192.168.103.94/api
+    - REACT_APP_API_WEB_SOCKET=ws://192.168.103.94/api
+    - REACT_APP_API_EVENT=http://192.168.103.94/api
+    - PORT=80

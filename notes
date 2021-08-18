@@ -1,0 +1,3 @@
+* Create Socket Channel to receive the message
+* Pass to other channel to process
+* Pass to last channel to send to client
