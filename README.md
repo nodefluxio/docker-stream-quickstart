@@ -1,4 +1,6 @@
-# Vanilla-Dashboard
+# Vanilla Dashboard for Docker Stream
+
+This is the source code of Vanilla Dashboard for developer to learn how develop dashboard on top ov Docker Stream component; visionaire4 and fremis-n.
 
 ## Features
 
