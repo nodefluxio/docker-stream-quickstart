@@ -5,7 +5,7 @@
 This is list of all feature that is available on vanilla dashboard. Feature listed below have their own page.
 
 API Documentation:
-- Stream/Camera related API : https://docs.nodeflux.io/visionaire-docker-stream/integration-point
+- Stream/Camera related API : https://docs.nodeflux.io/visionaire-docker-stream/developer-guide/apis
 
 - Enrollment API: https://gitlab.com/nodefluxio/vanilla-dashboard/-/blob/master/contract.md
 
