@@ -11,7 +11,8 @@ export default function IconPlaceholder(props) {
     height,
     onClick,
     className,
-    disable
+    disable,
+    hover
   } = props;
   return (
     <IconWrapper
@@ -22,6 +23,7 @@ export default function IconPlaceholder(props) {
       height={height}
       className={className}
       disable={disable}
+      hover={hover}
     >
       {children}
     </IconWrapper>
@@ -36,7 +38,8 @@ IconPlaceholder.propTypes = {
   onClick: PropType.func,
   width: PropType.string,
   className: PropType.string,
-  disable: PropType.bool
+  disable: PropType.bool,
+  hover: PropType.bool
 };
 
 IconPlaceholder.defaultProps = {
@@ -46,7 +49,8 @@ IconPlaceholder.defaultProps = {
   height: "40px",
   width: "40px",
   className: "",
-  disable: false
+  disable: false,
+  hover: false
 };
 
 const IconWrapper = Styled.div`
@@ -62,7 +66,7 @@ const IconWrapper = Styled.div`
   cursor: ${props =>
     typeof props.onClick === "function" && !props.disable
       ? `pointer`
-      : `default`}
+      : `default`};
   ${props => props.disable && `opacity: 0.5;`}
   img { 
     @media (orientation: landscape) {
@@ -71,5 +75,8 @@ const IconWrapper = Styled.div`
     @media (orientation: potrait) {
       max-width: 100%;
     }
+  }
+  :hover {
+    ${props => props.hover && !props.disable && `background: #4c12a1`};
   }
 `;

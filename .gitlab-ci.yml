@@ -4,25 +4,16 @@ services:
   - docker:dind
 
 stages:
-  - typecheck
+  - unit_test
   - build_tag
   - build_latest
+  - push_registry
 
-# before_script:
-#   - "which ssh-agent || ( apk --update add openssh-client git -y )"
-#   - eval $(ssh-agent -s)
-#   - echo $SSH_PRIVATE_KEY
-#   - ssh-add <(echo "$SSH_PRIVATE_KEY")
-#   - mkdir -p /root/.ssh
-#   - chmod 700 /root/.ssh
-#   - ssh-keyscan gitlab.com >> /root/.ssh/known_hosts
-#   - chmod 644 /root/.ssh/known_hosts
-
-typecheck:
-  stage: typecheck
+unit_test:
+  stage: unit_test
   image: golang:1.13-alpine
   before_script:
-    - apk add --no-cache curl git openssh-client protobuf protobuf-dev build-base
+    - apk add --no-cache curl git openssh-client build-base
   script:
     - mkdir -p /root/.ssh && chmod 0700 /root/.ssh
     - echo "$SSH_PUBLIC_KEY" > /root/.ssh/id_rsa.pub
@@ -33,42 +24,55 @@ typecheck:
     - cat /root/.ssh/id_rsa.pub
     - cat /root/.ssh/id_rsa
     - git config --global --add url."git@gitlab.com:".insteadOf "https://gitlab.com/"
-    - cd /
     - export GO111MODULE=on
     - go get -u golang.org/x/lint/golint
-    - go get -u github.com/golang/protobuf/protoc-gen-go
-    - go get -u google.golang.org/genproto/googleapis/rpc/status
-    - go get -u github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
-    - go get -u github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger
-    - git clone https://github.com/googleapis/googleapis.git /googleapis
-    - git clone git@gitlab.com:nodefluxio/nodefluxapis.git /nodefluxapis && cd /nodefluxapis && git checkout v0.2.7-alpha3 && GOOGLEAPIS_PATH=/googleapis make GO_OUT_DIR=/gitlab.com/nodefluxio go && git checkout master && GOOGLEAPIS_PATH=/googleapis make GO_OUT_DIR=/ go
-    - git clone git@gitlab.com:nodefluxio/extensionapis.git /extensionapis && cd /extensionapis && make GO_OUT_DIR=/ go
-    - git clone git@gitlab.com:nodefluxio/analytic-service.git /analytic-service && cd /analytic-service && git checkout development && GOOGLEAPIS_PATH=/googleapis NODEFLUXAPIS_PATH=/nodefluxapis make GO_OUT_DIR=/ go
-    - cd /gitlab.com/nodefluxio/cuan && echo $(pwd)
     - go mod download
-    - golint -set_exit_status $(go list ./...)
+    - make test
+    # will be fix in next issue
+    # - golint -set_exit_status $(go list ./...)
   only:
     - branches
 
-build_tag:
+build_vanilla:
   stage: build_tag
+  variables:
+    DOCKER_DRIVER: overlay2
   script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" --build-arg ssh_prv_key="$SSH_PRIVATE_KEY" --build-arg ssh_pub_key="$SSH_PUBLIC_KEY" .
+    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" --build-arg ssh_prv_key="$SSH_PRIVATE_KEY" --build-arg ssh_pub_key="$SSH_PUBLIC_KEY" --network host .
     - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
-    - docker build -f Dockerfile.plugin -t "registry.gitlab.com/nodefluxio/vanilla-dashboard/search-dukcapil:$CI_COMMIT_TAG" --build-arg ssh_prv_key="$SSH_PRIVATE_KEY" --build-arg ssh_pub_key="$SSH_PUBLIC_KEY" .
-    - docker push "registry.gitlab.com/nodefluxio/vanilla-dashboard/search-dukcapil:$CI_COMMIT_TAG"
+  only:
+    - tags
+
+push_docker_hub:
+  stage: push_registry
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^([0-9]+)\.([0-9]+)\.([0-9]+)$/'
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - docker pull "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
     - docker login --username nodefluxio --password ${DOCKERHUB_ACCESS_TOKEN}
     - docker tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" "nodefluxio/vanilla-dashboard:$CI_COMMIT_TAG"
     - docker push "nodefluxio/vanilla-dashboard:$CI_COMMIT_TAG"
+
+build_plugin_search:
+  stage: build_tag
+  variables:
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - docker build -f Dockerfile.plugin -t "registry.gitlab.com/nodefluxio/vanilla-dashboard/search:$CI_COMMIT_TAG" --build-arg ssh_prv_key="$SSH_PRIVATE_KEY" --build-arg ssh_pub_key="$SSH_PUBLIC_KEY" --network host .
+    - docker push "registry.gitlab.com/nodefluxio/vanilla-dashboard/search:$CI_COMMIT_TAG"
   only:
     - tags
 
 build_latest:
   stage: build_latest
+  variables:
+    DOCKER_DRIVER: overlay2
   script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-    - docker build -t "$CI_REGISTRY_IMAGE:latest" --build-arg ssh_prv_key="$SSH_PRIVATE_KEY" --build-arg ssh_pub_key="$SSH_PUBLIC_KEY" .
+    - docker build -t "$CI_REGISTRY_IMAGE:latest" --build-arg ssh_prv_key="$SSH_PRIVATE_KEY" --build-arg ssh_pub_key="$SSH_PUBLIC_KEY" --network host .
     - docker push "$CI_REGISTRY_IMAGE:latest"
     - docker login --username nodefluxio --password ${DOCKERHUB_ACCESS_TOKEN}
     - docker tag "$CI_REGISTRY_IMAGE:latest" "nodefluxio/vanilla-dashboard:latest"

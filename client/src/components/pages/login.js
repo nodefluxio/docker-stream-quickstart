@@ -3,7 +3,7 @@
 /* eslint-disable camelcase */
 import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { emailLogin, resetAuthError, getAccessToken } from "store/actions/auth";
+import { emailLogin, resetAuthError } from "store/actions/auth";
 import styled, { ThemeProvider } from "styled-components";
 
 import logo from "assets/icon/visionaire/v-logo.svg";
@@ -138,15 +138,12 @@ export default function Login(props) {
   // redux state
   const userToken = useSelector(state => state.user.token);
   const errorMessage = useSelector(state => state.user.errorMessage);
-  const isRetryLogin = useSelector(state => state.user.isRetryLogin);
 
   useEffect(() => {
     if (userToken) {
       setIsLoading(false);
       dispatch(resetAuthError());
       props.history.push("/");
-    } else if (!isRetryLogin) {
-      dispatch(getAccessToken());
     }
 
     if (errorMessage) {

@@ -126,6 +126,9 @@ func (s *ServiceImpl) Sync(ctx context.Context) error {
 					FaceID:         v.Payload.FaceID,
 					IdentityNumber: v.Payload.IdentityNumber,
 					Name:           v.Payload.Name,
+					Gender:         v.Payload.Gender,
+					BirthPlace:     v.Payload.BirthPlace,
+					BirthDate:      v.Payload.BirthDate,
 					Status:         v.Payload.Status,
 				}
 				err := s.EnrollmentVanillaRepo.CreateFaceEnrollment(ctx, dataEnroll, decodedImage)
@@ -169,6 +172,9 @@ func (s *ServiceImpl) Sync(ctx context.Context) error {
 						FaceID:         v.Payload.FaceID,
 						IdentityNumber: v.Payload.IdentityNumber,
 						Name:           v.Payload.Name,
+						Gender:         v.Payload.Gender,
+						BirthPlace:     v.Payload.BirthPlace,
+						BirthDate:      v.Payload.BirthDate,
 						Status:         v.Payload.Status,
 					}
 					err := s.EnrollmentVanillaRepo.UpdateFaceEnrollment(ctx, dataVanilla.Results.Enrollments[0].ID, dataEnroll, decodedImage)

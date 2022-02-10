@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { withRouter } from "react-router-dom";
-import { useDispatch } from "react-redux";
+import { connect, useDispatch } from "react-redux";
 import { getCookie } from "helpers/cookies";
 import PropTypes from "prop-types";
 import { logOut } from "../../store/actions/auth";
@@ -10,9 +10,8 @@ export default function requireAuth(Component) {
     // redux action dispatcher
     const dispatch = useDispatch();
 
-    const accessToken = getCookie("access_token");
-
     useEffect(() => {
+      const accessToken = getCookie("access_token");
       // handle when user logout, user clear cache, or network error
       if (!accessToken || accessToken === undefined) {
         dispatch(logOut());
@@ -30,5 +29,11 @@ export default function requireAuth(Component) {
     history: PropTypes.object
   };
 
-  return withRouter(AuthenticatedComponent);
+  function mapStateToProps(state) {
+    return {
+      user: state.user
+    };
+  }
+
+  return withRouter(connect(mapStateToProps)(AuthenticatedComponent));
 }

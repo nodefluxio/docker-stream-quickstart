@@ -12,63 +12,23 @@ const imageInlineSizeLimit = parseInt(
   10
 );
 
-const ASSET_PATH = process.env.ASSET_PATH || "/";
-// style files regexes
-const cssRegex = /\.css$/;
-const cssModuleRegex = /\.module\.css$/;
-
 module.exports = webpackEnv => {
-  const isEnvDevelopment = webpackEnv === "development";
-  const isEnvProduction = webpackEnv === "production";
-
-  // common function to get style loaders
-  const getStyleLoaders = (cssOptions, preProcessor) => {
-    const loaders = [
-      isEnvDevelopment && require.resolve("style-loader"),
-      isEnvProduction && {
-        loader: MiniCssExtractPlugin.loader
-      },
-      {
-        loader: require.resolve("css-loader"),
-        options: cssOptions
-      }
-    ].filter(Boolean);
-    if (preProcessor) {
-      loaders.push(
-        {
-          loader: require.resolve("resolve-url-loader"),
-          options: {
-            root: path.resolve(__dirname, "src")
-          }
-        },
-        {
-          loader: require.resolve(preProcessor),
-          options: {
-            sourceMap: true
-          }
-        }
-      );
-    }
-    return loaders;
-  };
+  const isEnvProduction = !webpackEnv.WEBPACK_SERVE;
 
   return {
     entry: path.resolve(__dirname, "src/index.js"),
     output: {
       path: path.resolve(__dirname, "build"),
       filename: "bundle.[contenthash].js",
-      publicPath: ASSET_PATH
+      publicPath: "/"
     },
     devServer: {
-      contentBase: path.resolve(__dirname, "build"),
       hot: true,
       port: 8083,
       historyApiFallback: true
     },
     module: {
       rules: [
-        // Disable require.ensure as it's not a standard language feature.
-        { parser: { requireEnsure: false } },
         {
           // "oneOf" will traverse all following loaders until one will
           // match the requirements. When no loader matches it will fall
@@ -140,18 +100,6 @@ module.exports = webpackEnv => {
                 cacheCompression: false
               }
             },
-            {
-              test: cssRegex,
-              exclude: cssModuleRegex,
-              use: getStyleLoaders({
-                importLoaders: 1
-              }),
-              // Don't consider CSS imports dead code even if the
-              // containing package claims to have no side effects.
-              // Remove this when webpack adds a warning or an error for this.
-              // See https://github.com/webpack/webpack/issues/6571
-              sideEffects: true
-            },
             // "file" loader makes sure those assets get served by WebpackDevServer.
             // When you `import` an asset, you get its (virtual) filename.
             // In production, they would get copied to the `build` folder.
@@ -182,13 +130,16 @@ module.exports = webpackEnv => {
       new CleanWebpackPlugin(),
       new webpack.HotModuleReplacementPlugin(),
       new HtmlWebpackPlugin({
-        template: path.resolve(__dirname, "src/index.html")
+        template: path.resolve(__dirname, "public/index.html")
       }),
       new CopyPlugin({
         patterns: [
           {
             from: path.resolve(__dirname, "public"),
-            to: path.resolve(__dirname, "build")
+            to: path.resolve(__dirname, "build"),
+            globOptions: {
+              ignore: ["**/index.html"]
+            }
           }
         ]
       }),
@@ -207,14 +158,15 @@ module.exports = webpackEnv => {
             import: "react", // the "react" package will be used a provided and fallback module
             shareKey: "react", // under this name the shared module will be placed in the share scope
             shareScope: "default", // share scope with this name will be used
-            singleton: true // only a single version of the shared module is allowed
-          },
-          "react-dom": {
-            singleton: true // only a single version of the shared module is allowed
+            singleton: true, // only a single version of the shared module is allowed
+            eager: true,
+            requiredVersion: "^17.0.2"
           },
           "styled-components": {
-            singleton: true
-          }
+            singleton: true,
+            eager: true
+          },
+          "core-js": { singleton: true, eager: true }
         }
       })
     ],

@@ -3,7 +3,7 @@ PKG_LIST := $(shell go list ${PKG}... | grep -v /client/)
 
 .PHONY: test
 test:
-	@go test ${PKG_LIST} -coverprofile .testCoverage.txt -timeout 5s \
+	@go test ${PKG_LIST} -coverprofile .testCoverage.txt -timeout 30s \
 		&& go tool cover -func=.testCoverage.txt
 	@rm .testCoverage.txt
 

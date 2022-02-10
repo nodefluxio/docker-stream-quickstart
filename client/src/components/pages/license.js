@@ -41,15 +41,20 @@ function License(props) {
   }, []);
 
   const renderListLicns = data.map((license, i) => {
-    const seats = license.seats.map((key, index) => (
-      <li key={index}>{key.serial_number}</li>
-    ));
+    let seats = null;
+    if (license.seats && license.seats.length > 0) {
+      seats = license.seats.map((key, index) => (
+        <li key={index}>{key.serial_number}</li>
+      ));
+    }
 
     return (
       <LicenseGroup key={i}>
         <div>
           <h2 className="title">{license.name}</h2>
-          <h3 className="title2">Total {license.seats.length}</h3>
+          {license.seats && (
+            <h3 className="title2">Total {license.seats.length}</h3>
+          )}
         </div>
         <LicenseList>{seats}</LicenseList>
       </LicenseGroup>

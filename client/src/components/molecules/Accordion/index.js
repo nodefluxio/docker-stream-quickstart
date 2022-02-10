@@ -6,18 +6,23 @@ import IconPlaceholder from "components/atoms/IconPlaceholder";
 import ChevronIcon from "assets/icon/visionaire/arrow-up.svg";
 
 export default function Accordion(props) {
-  const { header, icon, children, type } = props;
-  const [isActive, setIsActive] = useState(type !== "closed");
+  const { header, icon, children, open, callback, trigger } = props;
+  const [isActive, setIsActive] = useState(open);
   const [height, setHeight] = useState(0);
   const contentRef = useRef(null);
 
   function toggleAccordion() {
+    callback();
     setIsActive(!isActive);
   }
 
   useEffect(() => {
     setHeight(!isActive ? 0 : contentRef.current.scrollHeight);
-  }, [isActive, children]);
+  }, [isActive, children, trigger]);
+
+  useEffect(() => {
+    setIsActive(open);
+  }, [open]);
 
   return (
     <Wrapper>
@@ -48,13 +53,16 @@ export default function Accordion(props) {
 Accordion.propTypes = {
   header: PropTypes.string.isRequired,
   icon: PropTypes.string,
-  children: PropTypes.oneOfType([PropTypes.array, PropTypes.element])
-    .isRequired,
-  type: PropTypes.string
+  children: PropTypes.oneOfType([PropTypes.array, PropTypes.element]),
+  open: PropTypes.bool,
+  callback: PropTypes.func,
+  trigger: PropTypes.any
 };
 
 Accordion.defaultProps = {
-  icon: ""
+  icon: "",
+  callback: () => {},
+  trigger: null
 };
 
 const Wrapper = Styled.div`
@@ -93,5 +101,7 @@ const Content = Styled.div`
     max-height: ${props => props.maxHeight}px;
     transition: 0.3s;
     padding: 0px 16px;
-    margin: ${props => (props.maxHeight === 0 ? `10px 0px` : `20px 0px`)};
+    margin: ${props => (props.maxHeight === 0 ? `0px` : `20px 0px`)};
+    border-bottom: ${props =>
+      props.maxHeight === 0 ? `1px solid ${props.theme.bg}` : `none`};
 `;

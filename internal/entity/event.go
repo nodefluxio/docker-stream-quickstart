@@ -80,3 +80,15 @@ type ExportEventItem struct {
 	EventTime      string
 	CreatedAt      string
 }
+
+// EventInsight is struct for event insight
+type EventInsight struct {
+	Timezone        string
+	TimeDeffinition string
+	Filter          map[string]string
+}
+
+// EventInsightData is struct for event insight data
+type EventInsightData struct {
+	Total uint64 `json:"total" db:"total"`
+}

@@ -29,6 +29,8 @@ func NewEnrollmentVanillaServiceRepo(conn string) repository.EnrollmentVanilla {
 	}
 }
 
+const dateLayout = "2006-01-02"
+
 func (r *enrollmentVanillaServiceRepo) CreateFaceEnrollment(ctx context.Context, data *entity.VanillaEnrollmentPayload, images []*entity.EnrollmentImage) error {
 	url := fmt.Sprintf("%s/api/enrollment", r.URL)
 	method := "POST"
@@ -54,9 +56,11 @@ func (r *enrollmentVanillaServiceRepo) CreateFaceEnrollment(ctx context.Context,
 			}
 		}
 	}
-
 	writer.WriteField("identity_number", data.IdentityNumber)
 	writer.WriteField("name", data.Name)
+	writer.WriteField("gender", data.Gender)
+	writer.WriteField("birth_place", data.BirthPlace)
+	writer.WriteField("birth_date", data.BirthDate.Format(dateLayout))
 	writer.WriteField("status", data.Status)
 	writer.WriteField("face_id", strconv.FormatUint(data.FaceID, 10))
 	err := writer.Close()
@@ -135,6 +139,9 @@ func (r *enrollmentVanillaServiceRepo) UpdateFaceEnrollment(ctx context.Context,
 
 	writer.WriteField("identity_number", data.IdentityNumber)
 	writer.WriteField("name", data.Name)
+	writer.WriteField("gender", data.Gender)
+	writer.WriteField("birth_place", data.BirthPlace)
+	writer.WriteField("birth_date", data.BirthDate.Format(dateLayout))
 	writer.WriteField("status", data.Status)
 	writer.WriteField("face_id", strconv.FormatUint(data.FaceID, 10))
 	err := writer.Close()

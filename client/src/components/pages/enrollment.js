@@ -1,9 +1,11 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, Fragment, useEffect, useContext } from "react";
 import { connect } from "react-redux";
+import dayjs from "dayjs";
 import Styled, { ThemeContext } from "styled-components";
 import PropTypes from "prop-types";
 import qs from "qs";
+import { saveAs } from "file-saver";
 import Button from "components/molecules/Button";
 import Dropdown, { Menu as Item } from "components/atoms/Dropdown";
 import IconPlaceholder from "components/atoms/IconPlaceholder";
@@ -13,7 +15,11 @@ import ThumbnailCard from "components/atoms/ThumbnailCard";
 import Input from "components/atoms/Input";
 
 import PageWrapper from "components/organisms/pageWrapper";
-import { AddEnrollment, BatchEnrollment } from "components/organisms/modals";
+import {
+  AddEnrollment,
+  BatchEnrollment,
+  BackupEnrollment
+} from "components/organisms/modals";
 import Pagination from "components/organisms/pagination";
 import LoadingSpinner from "components/atoms/LoadingSpinner";
 
@@ -21,6 +27,7 @@ import {
   getListEnrollment,
   deleteEnrollment,
   getEnrollment,
+  backupEnrollment,
   deleteAllEnrollment
 } from "api";
 
@@ -31,6 +38,7 @@ import SearchIcon from "assets/icon/visionaire/search.svg";
 import ArrowDown from "assets/icon/visionaire/drop-down.svg";
 import SinglePerson from "assets/icon/visionaire/Union.svg";
 import MultiplePerson from "assets/icon/visionaire/collabolators.svg";
+import Backup from "assets/icon/visionaire/backup.svg";
 import DeleteIcon from "assets/icon/visionaire/delete.svg";
 
 import { REACT_APP_API_ENROLLMENT } from "config";
@@ -43,6 +51,7 @@ function Enrollment(props) {
   const [openAdd, setOpenAdd] = useState(false);
   const [openBatch, setOpenBatch] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isBackupInProgress, setBackupInProgress] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedData, setSelectedData] = useState([]);
   const themeContext = useContext(ThemeContext);
@@ -50,21 +59,39 @@ function Enrollment(props) {
   const [totalData, setTotalData] = useState(0);
   const [noData, setNoData] = useState(false);
   const [errMsg, setErrMsg] = useState("");
-  const [searchValue, setSearchValue] = useState("");
+  const [searchValue, setSearchValue] = useState(undefined);
   const [isConfirmAllOpen, setIsConfirmAllOpen] = useState(false);
   const [isLoadingDeleteAll, setIsLoadingDeleteAll] = useState(false);
   const [isDisconnected, setIsDisconnected] = useState(false);
+  const [defaultQuery, setDefaultQuery] = useState("");
+  const [dataLoading, setDataLoading] = useState(false);
 
-  function getDetail(id) {
+  const getDetail = id => {
     getEnrollment(id).then(result => {
       if (result.ok) {
         setSelectedData(result.enrollment);
         setOpenAdd(true);
       }
     });
-  }
+  };
+
+  const backupEnrollmentHandler = () => {
+    setBackupInProgress(true);
+    backupEnrollment()
+      .then(res => {
+        const fileName = `data_${dayjs().format("YYYY-MM-DD")}.zip`;
+        saveAs(res, fileName);
+        setBackupInProgress(false);
+      })
+      .catch(err => {
+        // eslint-disable-next-line no-console
+        console.error(err);
+        setBackupInProgress(false);
+      });
+  };
 
   const callGetListEnrollment = query => {
+    setDataLoading(true);
     getListEnrollment(query)
       .then(result => {
         if (result.ok) {
@@ -88,6 +115,7 @@ function Enrollment(props) {
           setTotalData(0);
           setTotalPage(0);
         }
+        setDataLoading(false);
       })
       .catch(err => {
         setErrMsg(err.message);
@@ -95,6 +123,7 @@ function Enrollment(props) {
         setDataEnrollment([]);
         setTotalData(0);
         setTotalPage(0);
+        setDataLoading(false);
       });
   };
 
@@ -153,28 +182,10 @@ function Enrollment(props) {
   };
 
   const closeModal = data => {
-    if (data && Object.keys(data).length > 1 && data.constructor === Object) {
-      setTotalData(totalData + 1);
-      setTotalPage(Math.ceil((totalData + 1) / LIMIT_DATA));
-      const { search } = history.location;
-      const searchParam = qs.parse(search.replace("?", ""));
-      if (
-        parseInt(searchParam.page, 10) === parseInt(totalPage, 10) &&
-        totalData / LIMIT_DATA !== 1
-      ) {
-        setDataEnrollment(dataEnrollment.concat(data));
-      }
-    } else if (
-      data &&
-      Object.keys(data).length === 1 &&
-      Object.keys(data)[0] === "name"
-    ) {
-      const index = dataEnrollment.findIndex(x => x.id === selectedData.id);
-      const newDataEnrollment = dataEnrollment;
-      newDataEnrollment[index].name = data.name;
-      setDataEnrollment(newDataEnrollment);
+    if (data) {
+      const query = history.location.search.replace("?", "");
+      callGetListEnrollment(query);
     }
-
     setOpenAdd(false);
   };
 
@@ -190,6 +201,7 @@ function Enrollment(props) {
     const getQueryUrl = history.location.search.replace("?", "");
     const queryUrl = qs.parse(getQueryUrl);
     queryUrl.search = searchValue;
+    queryUrl.page = 1;
     const query = qs.stringify(queryUrl);
     history.replace(`${history.location.pathname}?${query}`);
   }
@@ -203,15 +215,23 @@ function Enrollment(props) {
   }
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      onSubmitSearch();
-    }, 700);
+    let timeout = setTimeout(() => {});
+    if (searchValue !== undefined) {
+      timeout = setTimeout(() => {
+        onSubmitSearch();
+      }, 700);
+    }
     return () => clearTimeout(timeout);
   }, [searchValue]);
 
   useEffect(() => {
-    const query = history.location.search.replace("?", "");
-    callGetListEnrollment(query);
+    if (history.location.search) {
+      const query = history.location.search.replace("?", "");
+      if (query !== defaultQuery) {
+        callGetListEnrollment(query);
+        setDefaultQuery(query);
+      }
+    }
   }, [history.location]);
 
   const AddEnrollmentMenu = (
@@ -227,6 +247,12 @@ function Enrollment(props) {
           <img src={MultiplePerson} alt="multiple-person" />
         </IconPlaceholder>
         BATCH ENROLLMENT
+      </Item>
+      <Item onClick={() => checkAgentStatus(() => backupEnrollmentHandler())}>
+        <IconPlaceholder width="24px" height="24px" className="mr-4">
+          <img src={Backup} alt="multiple-person" />
+        </IconPlaceholder>
+        BACKUP ENROLLMENT
       </Item>
     </Fragment>
   );
@@ -310,6 +336,15 @@ function Enrollment(props) {
               )}
             </Layout>
           </Pagination>
+          {dataLoading && dataEnrollment.length > 0 && (
+            <BlankContainer
+              position="absolute"
+              backgroundColor="rgba(0,0,0,0.3)"
+              top="0"
+            >
+              <LoadingSpinner show={dataLoading} />
+            </BlankContainer>
+          )}
         </ContentContainer>
       </PageWrapper>
       <Modal
@@ -365,6 +400,7 @@ function Enrollment(props) {
         withCancelButton={false}
       />
       <AddEnrollment
+        type="person"
         openModal={openAdd}
         onClose={data => closeModal(data)}
         data={selectedData}
@@ -374,6 +410,7 @@ function Enrollment(props) {
         onClose={refreshFlag => closeModalBatchErollment(refreshFlag)}
         data={selectedData}
       />
+      <BackupEnrollment openModal={isBackupInProgress} />
     </Fragment>
   );
 }
@@ -395,7 +432,7 @@ const ContentContainer = Styled.div`
   position: relative;
   margin-top: 20px;
   overflow: hidden;
-  height: calc( 100% - 130px);
+  height: calc( 100% - 140px);
 `;
 
 const Layout = Styled.div`

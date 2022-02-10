@@ -7,6 +7,8 @@ import RefreshIcon from "assets/icon/visionaire/refresh.svg";
 import PenIcon from "assets/icon/visionaire/pen.svg";
 import Remove from "assets/icon/visionaire/remove.svg";
 
+import { colorRoi } from "theme";
+
 const { d3 } = window;
 export default class RegionInterest extends React.Component {
   // 1. click the icon draw
@@ -24,29 +26,6 @@ export default class RegionInterest extends React.Component {
       tempLine: null,
       points: [],
       focus: null,
-      colors: [
-        "#e6194b",
-        "#3cb44b",
-        "#ffe119",
-        "#4363d8",
-        "#f58231",
-        "#911eb4",
-        "#46f0f0",
-        "#f032e6",
-        "#bcf60c",
-        "#fabebe",
-        "#008080",
-        "#e6beff",
-        "#9a6324",
-        "#fffac8",
-        "#800000",
-        "#aaffc3",
-        "#808000",
-        "#ffd8b1",
-        "#000075",
-        "#808080",
-        "#000000"
-      ],
       usedColors: [],
       activeColor: null,
       isFocus: false,
@@ -93,8 +72,8 @@ export default class RegionInterest extends React.Component {
   };
 
   selectedColor = () => {
-    const { colors, usedColors } = this.state;
-    const available = colors.filter(color => !usedColors.includes(color));
+    const { usedColors } = this.state;
+    const available = colorRoi.filter(color => !usedColors.includes(color));
     const number = this.generateRandomNumber(0, available.length);
     const chosen = available[number];
 
@@ -317,11 +296,7 @@ export default class RegionInterest extends React.Component {
     const { height, width, draw, image } = this.state;
     return (
       <RoiStyled>
-        <Canvas
-          id="canvas"
-          className={` flex flex-column ${draw}`}
-          style={{ width, height }}
-        >
+        <Canvas id="canvas" className={`${draw}`} style={{ width, height }}>
           <img src={image} alt="streamer" />
         </Canvas>
         {isRoiNeed && (

@@ -12,3 +12,7 @@ type FaceEnrollment struct {
 	FaceID    string `json:"face_id"`
 	Variation string `json:"variation"`
 }
+
+type FaceEmbedings struct {
+	Embeddings [][]float64 `json:"embeddings"`
+}

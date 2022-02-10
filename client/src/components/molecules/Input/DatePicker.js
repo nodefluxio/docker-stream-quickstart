@@ -163,7 +163,8 @@ export default class DatePicker extends Component {
       PropTypes.instanceOf(Date)
     ]),
     minHours: PropTypes.string,
-    popperPlacement: PropTypes.string
+    popperPlacement: PropTypes.string,
+    shouldCloseOnSelect: PropTypes.bool
   };
 
   static defaultProps = {
@@ -181,7 +182,8 @@ export default class DatePicker extends Component {
     startDate: new Date(),
     endDate: new Date(),
     minHours: "",
-    popperPlacement: ""
+    popperPlacement: "",
+    shouldCloseOnSelect: false
   };
 
   constructor(props) {
@@ -277,7 +279,8 @@ export default class DatePicker extends Component {
       dropdownMode,
       showMonthDropdown,
       popperPlacement,
-      showYearDropdown
+      showYearDropdown,
+      shouldCloseOnSelect
     } = this.props;
     let conditionalDate = {};
     let minH = {};
@@ -351,7 +354,7 @@ export default class DatePicker extends Component {
           {...generalDate}
           popperPlacement={popperPlacement}
           ref={name}
-          shouldCloseOnSelect={false}
+          shouldCloseOnSelect={shouldCloseOnSelect}
         >
           {time && (
             <Fragment>

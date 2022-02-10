@@ -1,7 +1,10 @@
 package zipper
 
-import "context"
+import (
+	"context"
+	"os"
+)
 
 type Zipper interface {
-	Create(ctx context.Context, source, target string) error
+	Create(ctx context.Context, source, target string) (*os.File, error)
 }

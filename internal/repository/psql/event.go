@@ -72,13 +72,14 @@ func (p *psqlEventRepo) mappingField(key string) string {
 		key = "status"
 	case "timestamp":
 		key = "event_time"
+	case "analytic_id":
+		key = "type"
 	}
 	return key
 }
 
 func (p *psqlEventRepo) mappingValue(value []string) []string {
 	for i := 0; i < len(value); i++ {
-		strings.ToLower(value[i])
 		switch strings.ToLower(value[i]) {
 		case "unrecognized":
 			value[i] = "UNKNOWN"
@@ -93,6 +94,7 @@ func (p *psqlEventRepo) generateFilter(ctx context.Context, filter map[string]st
 	// create query for filter
 	for key, val := range filter {
 		switch key {
+		case "node_num":
 		case "timestamp_from":
 		case "timestamp_to":
 			dateFrom := filter["timestamp_from"]
@@ -102,7 +104,11 @@ func (p *psqlEventRepo) generateFilter(ctx context.Context, filter map[string]st
 			if val != "" {
 				newval := p.mappingValue(strings.Split(val, ","))
 				key = p.mappingField(key)
-				tx = tx.Where(fmt.Sprintf("%s IN (?)", key), newval)
+				if len(newval) > 1 {
+					tx = tx.Where(fmt.Sprintf("%s IN (?)", key), newval)
+				} else {
+					tx = tx.Where(fmt.Sprintf("%s = ?", key), newval)
+				}
 			}
 		}
 	}
@@ -148,6 +154,9 @@ func (p *psqlEventRepo) Get(ctx context.Context, paging *util.Pagination) ([]*en
 	}
 
 	err := tx.Find(&data).Error
+	if err != nil {
+		return nil, err
+	}
 	return data, err
 }
 
@@ -179,6 +188,37 @@ func (p *psqlEventRepo) GetWithoutImage(ctx context.Context, paging *util.Pagina
 	}
 
 	err := tx.Find(&data).Error
+	if err != nil {
+		return nil, err
+	}
+	return data, err
+}
+
+func (p *psqlEventRepo) GetWithLastID(ctx context.Context, lastID uint64, paging *util.Pagination) ([]*entity.Event, error) {
+	var data []*entity.Event
+	tx := p.Conn.Select("id, type, stream_id, primary_image, secondary_image, result, status, event_time")
+
+	if lastID > 0 {
+		tx = tx.Where("id < ?", lastID)
+	}
+	// create query for filter
+	tx = p.generateFilter(ctx, paging.Filter, tx)
+
+	// create query for search
+	tx = p.generateSearch(ctx, paging.Search, tx)
+
+	// sort
+	tx = tx.Order("event_time DESC")
+
+	// Limit and offset
+	if paging.Limit != 0 {
+		tx = tx.Limit(paging.Limit)
+	}
+
+	err := tx.Find(&data).Error
+	if err != nil {
+		return nil, err
+	}
 	return data, err
 }
 
@@ -190,10 +230,58 @@ func (p *psqlEventRepo) Count(ctx context.Context, paging *util.Pagination) (int
 	// create query for search
 	tx = p.generateSearch(ctx, paging.Search, tx)
 	err := tx.Table("event").Count(&count).Error
+
 	return count, err
 }
 
 func (p *psqlEventRepo) Partition(ctx context.Context, date time.Time) error {
 	query := "SELECT create_daily_event(?::timestamp);"
 	return p.Conn.Exec(query, date).Error
+}
+
+func (p *psqlEventRepo) GetInsight(ctx context.Context, data *entity.EventInsight) (*entity.EventInsightData, error) {
+	var count uint64
+
+	analyticID := data.Filter["analytic_id"]
+	tx := p.Conn.Table("event").Where("type = ?", analyticID)
+
+	newTimestamp, err := util.ConvertTimeNowToTzAndUtc(data.Timezone)
+	if err != nil {
+		return nil, err
+	}
+
+	switch data.TimeDeffinition {
+	case "today":
+		tx = tx.Where("event_time BETWEEN ?::timestamp AND CURRENT_TIMESTAMP::timestamp", newTimestamp)
+	case "yesterday":
+		tx = tx.Where("event_time BETWEEN ?::timestamp - INTERVAL '1 DAY' AND ?::timestamp", newTimestamp, newTimestamp)
+	case "week":
+		tx = tx.Where("event_time BETWEEN ?::timestamp - INTERVAL '7 DAY' and ?::timestamp  - INTERVAL '1 DAY'", newTimestamp, newTimestamp)
+	case "month":
+		tx = tx.Where("event_time BETWEEN ?::timestamp - INTERVAL '30 DAY' and ?::timestamp  - INTERVAL '1 DAY'", newTimestamp, newTimestamp)
+	}
+
+	filterType := data.Filter["type"]
+	if filterType != "" {
+		switch analyticID {
+		case "NFV4-PC":
+			tx = tx.Where("result->>'label' = ?", filterType)
+		case "NFV4-VC":
+			tx = tx.Where("result->>'label' = ?", filterType)
+		default:
+			typeValue := []string{filterType}
+			tx = tx.Where("status = ?", p.mappingValue(typeValue))
+		}
+	}
+
+	filterStreamID := data.Filter["stream_id"]
+	if filterStreamID != "" {
+		tx = tx.Where("stream_id = ?", filterStreamID)
+	}
+
+	err = tx.Count(&count).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entity.EventInsightData{Total: count}, nil
 }

@@ -21,10 +21,19 @@ type EventGroup struct {
 // EventData is struct for handling detail event
 type EventData struct {
 	ID             uint64    `json:"id"`
+	AnalyticID     string    `json:"analytic_id"`
 	PrimaryImage   []byte    `json:"primary_image"`
 	SecondaryImage []byte    `json:"secondary_image"`
 	Label          string    `json:"label"`
 	Result         string    `json:"result"`
 	Location       string    `json:"location"`
 	Timestamp      time.Time `json:"timestamp"`
+}
+
+// EventInsightData is struct for handling data in insight event
+type EventInsightData struct {
+	TotalToday     uint64 `json:"total_today"`
+	TotalYesterday uint64 `json:"total_yesterday"`
+	TotalWeek      uint64 `json:"total_week"`
+	TotalMonth     uint64 `json:"total_month"`
 }

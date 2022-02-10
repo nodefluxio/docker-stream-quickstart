@@ -1,4 +1,5 @@
 import QueryString from "qs";
+import { getTimeZone } from "helpers/dateTime";
 import { checkExportStatus, createEventExport } from "api";
 import {
   EXPORT_STATUS,
@@ -10,6 +11,7 @@ export function requestEventExport(query) {
   const queryFromEvent = QueryString.parse(query);
   delete queryFromEvent.page;
   delete queryFromEvent.limit;
+  queryFromEvent.timezone = getTimeZone();
   const exportQuery = QueryString.stringify(queryFromEvent);
   return async dispatch => {
     try {

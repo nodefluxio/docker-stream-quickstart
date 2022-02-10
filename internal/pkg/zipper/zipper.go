@@ -16,10 +16,10 @@ func NewZipper() Zipper {
 	return &zipperStruct{}
 }
 
-func (z *zipperStruct) Create(ctx context.Context, source, target string) error {
+func (z *zipperStruct) Create(ctx context.Context, source, target string) (*os.File, error) {
 	zipfile, err := os.Create(target)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer zipfile.Close()
 
@@ -28,7 +28,7 @@ func (z *zipperStruct) Create(ctx context.Context, source, target string) error 
 
 	info, err := os.Stat(source)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	var baseDir string
@@ -74,5 +74,5 @@ func (z *zipperStruct) Create(ctx context.Context, source, target string) error 
 		return err
 	})
 
-	return err
+	return zipfile, err
 }

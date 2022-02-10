@@ -4,7 +4,6 @@ import styled from "styled-components";
 
 export default function Checkbox(props) {
   const { value, text, checked, disable, circle } = props;
-
   const getTwoFunc = e => {
     const val = e.target.value;
     const { checked: check } = e.target;

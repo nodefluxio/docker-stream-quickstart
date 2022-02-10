@@ -57,6 +57,24 @@ var flags = []cli.Flag{
 		EnvVar: "DB_NAME",
 	},
 	cli.StringFlag{
+		Name:   "db-max-idle, dbmi",
+		Value:  "4",
+		Usage:  "postgreSQL database max idle connection",
+		EnvVar: "DB_MAX_IDLE_CONNECTION",
+	},
+	cli.StringFlag{
+		Name:   "db-max-open, dbmc",
+		Value:  "8",
+		Usage:  "postgreSQL database max open connection",
+		EnvVar: "DB_MAX_OPEN_CONNECTION",
+	},
+	cli.StringFlag{
+		Name:   "db-max-lifetime, dbmt",
+		Value:  "5",
+		Usage:  "postgreSQL database max connection lifetime in minute",
+		EnvVar: "DB_CONNECTION_MAX_LIFETIME_IN_MINUTE",
+	},
+	cli.StringFlag{
 		Name:   "cron-partition, crp",
 		Value:  "0 0 * * *",
 		Usage:  "database cronjob partition, ex: 0 0 * * *",
@@ -66,13 +84,16 @@ var flags = []cli.Flag{
 
 func action(c *cli.Context) {
 	options := cescoordinator.Options{
-		LogLevel:             c.String("log"),
-		AppPort:              c.String("port"),
-		DatabaseHost:         c.String("db-host"),
-		DatabaseUsername:     c.String("db-user"),
-		DatabasePassword:     c.String("db-password"),
-		DatabaseName:         c.String("db-name"),
-		CronjobPartitionSpec: c.String("cron-partition"),
+		LogLevel:                    c.String("log"),
+		AppPort:                     c.String("port"),
+		DatabaseHost:                c.String("db-host"),
+		DatabaseUsername:            c.String("db-user"),
+		DatabasePassword:            c.String("db-password"),
+		DatabaseName:                c.String("db-name"),
+		DatabaseMaxIdleConn:         c.String("db-max-idle"),
+		DatabaseMaxOpenConn:         c.String("db-max-open"),
+		DatabaseMaxLifetimeInMinute: c.String("db-max-lifetime"),
+		CronjobPartitionSpec:        c.String("cron-partition"),
 	}
 	logutil.Init(options.LogLevel)
 	validate := validator.New()

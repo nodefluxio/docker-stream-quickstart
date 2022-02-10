@@ -4,8 +4,10 @@ import {
   CameraDetail,
   Event,
   Assignment,
+  Vehicle,
   Plugin,
-  License
+  License,
+  Account
 } from "components/pages";
 
 const routes = [
@@ -16,7 +18,7 @@ const routes = [
     component: Camera
   },
   {
-    path: "/camera/:id",
+    path: "/camera/:node/:id",
     exact: true,
     fullscreen: true,
     component: CameraDetail
@@ -34,6 +36,12 @@ const routes = [
     component: Enrollment
   },
   {
+    path: "/vehicle",
+    exact: false,
+    fullscreen: false,
+    component: Vehicle
+  },
+  {
     path: "/event-history",
     exact: false,
     fullscreen: false,
@@ -42,11 +50,11 @@ const routes = [
   {
     path: "/assignment",
     exact: false,
-    fullscreen: false,
+    fullscreen: true,
     component: Assignment
   },
   {
-    path: "/plugin/*",
+    path: "/plugin/",
     exact: false,
     fullscreen: false,
     component: Plugin
@@ -56,6 +64,12 @@ const routes = [
     exact: false,
     fullscreen: false,
     component: License
+  },
+  {
+    path: "/account",
+    exact: false,
+    fullscreen: false,
+    component: Account
   }
 ];
 

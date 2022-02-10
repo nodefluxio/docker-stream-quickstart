@@ -1,6 +1,14 @@
 package entity
 
-import "time"
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"image"
+	"image/jpeg"
+	"os"
+	"time"
+)
 
 // FaceImage represent list of image use in enrolled face
 type FaceImage struct {
@@ -11,6 +19,23 @@ type FaceImage struct {
 	ImageThumbnail []byte     `json:"image_thumbnail,omitempty" db:"image_thumbnail"`
 	CreatedAt      time.Time  `json:"created_at,omitempty" db:"created_at"`
 	DeletedAt      *time.Time `json:"deleted_at,omitempty" db:"deleted_at"`
+}
+
+func (fi *FaceImage) WriteToJpeg(ctx context.Context, fileName string) (*os.File, error) {
+	out, _ := os.Create(fmt.Sprintf("%s.jpg", fileName))
+	defer out.Close()
+
+	image, _, err := image.Decode(bytes.NewReader(fi.Image))
+	if err != nil {
+		return nil, err
+	}
+
+	err = jpeg.Encode(out, image, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 type EventEnrollmentFaceImage struct {

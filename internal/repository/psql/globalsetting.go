@@ -12,7 +12,7 @@ type psqlGlobalSettingRepo struct {
 	Conn *gorm.DB
 }
 
-// NewGlobalSettingRepository is method to initiate Event repo
+// NewGlobalSettingRepository is method to initiate gloabl setting repo
 func NewGlobalSettingRepository(conn *gorm.DB) repository.GlobalSetting {
 	return &psqlGlobalSettingRepo{
 		Conn: conn,
@@ -28,6 +28,9 @@ func (p *psqlGlobalSettingRepo) Create(ctx context.Context, data *entity.GlobalS
 func (p *psqlGlobalSettingRepo) GetCurrent(ctx context.Context) (*entity.GlobalSetting, error) {
 	object := entity.GlobalSetting{}
 	err := p.Conn.First(&object).Error
+	if err != nil {
+		return nil, err
+	}
 	return &object, err
 }
 

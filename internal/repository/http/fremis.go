@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	logutil "gitlab.com/nodefluxio/goutils/pkg/log"
 
@@ -50,6 +52,12 @@ type postDeleteVariation struct {
 	Variations []string `json:"variations"`
 }
 
+type postDataVariation struct {
+	Image string `json:"image"`
+}
+
+const timeOutNumberInSecond = 10
+
 // NewFremisRepository will create an object that represent the analyticsetting.Repository interface
 func NewFremisRepository(baseURL, keyspace string) repository.FRemis {
 	return &fremisRepo{
@@ -79,6 +87,9 @@ func (r *fremisRepo) FaceEnrollment(ctx context.Context, image string) (*entity.
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
+
+	ctx, cancel := context.WithTimeout(ctx, timeOutNumberInSecond*time.Second)
+	defer cancel()
 	res, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		logutil.LogObj.SetErrorLog(map[string]interface{}{
@@ -255,6 +266,7 @@ func (r *fremisRepo) AddFaceVariation(ctx context.Context, faceID, image string)
 	postData, _ := json.Marshal(data)
 	apiURL := r.BaseURL + "/enrollment"
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(postData))
+
 	if err != nil {
 		logutil.LogObj.SetErrorLog(map[string]interface{}{
 			"fremisn_url": apiURL,
@@ -272,7 +284,8 @@ func (r *fremisRepo) AddFaceVariation(ctx context.Context, faceID, image string)
 		}, "Request face enrollment ")
 		return nil, err
 	}
-
+	ctx, cancel := context.WithTimeout(ctx, timeOutNumberInSecond*time.Second)
+	defer cancel()
 	res, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		logutil.LogObj.SetErrorLog(map[string]interface{}{
@@ -384,4 +397,84 @@ func (r *fremisRepo) DeleteFaceVariation(ctx context.Context, faceID string, var
 	}, "Log response delete face variation")
 
 	return nil
+}
+
+func (r *fremisRepo) GetFaceEmbedings(ctx context.Context, image string) (*entity.FaceEmbedings, error) {
+	// prepare endpoint
+	newURL := r.BaseURL + "/extract-embedding"
+
+	// prepare data request body
+	requestData := postDataVariation{
+		Image: image,
+	}
+	logutil.LogObj.SetInfoLog(map[string]interface{}{
+		"url": newURL,
+	}, "info url fremis GetFaceEmbedings")
+	postData, _ := json.Marshal(requestData)
+	req, err := http.NewRequest("POST", newURL, bytes.NewBuffer(postData))
+	if err != nil {
+		logutil.LogObj.SetErrorLog(map[string]interface{}{
+			"url":   newURL,
+			"error": err,
+		}, "Failed create new request")
+		return nil, err
+	}
+
+	// prepare header
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	// make a request
+	res, err := http.DefaultClient.Do(req.WithContext(ctx))
+	if err != nil {
+		logutil.LogObj.SetErrorLog(map[string]interface{}{
+			"error": err,
+		}, "Error Create client "+newURL)
+		return nil, err
+	}
+
+	// read response body
+	body, err := ioutil.ReadAll(res.Body)
+	defer res.Body.Close()
+	if err != nil {
+		logutil.LogObj.SetErrorLog(map[string]interface{}{
+			"error": err,
+		}, "Error when trying to read body")
+		return nil, err
+	}
+	logutil.LogObj.SetDebugLog(map[string]interface{}{
+		"http_code": res.StatusCode,
+		"body":      string(body),
+	}, "Log body")
+
+	// http code error handling
+	if res.StatusCode >= http.StatusBadRequest {
+		var response map[string]interface{}
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			logutil.LogObj.SetErrorLog(map[string]interface{}{
+				"error": err,
+			}, "Error when trying unmarshal data")
+			return nil, fmt.Errorf("error %d response from fremis API, with body : %s", res.StatusCode, string(body))
+		}
+		logutil.LogObj.SetErrorLog(map[string]interface{}{
+			"response":     response,
+			"http_code":    res.StatusCode,
+			"request_body": requestData,
+		}, "http code error handling")
+		return nil, errors.New(response["description"].(string))
+	}
+
+	var resp *entity.FaceEmbedings
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
+		logutil.LogObj.SetErrorLog(map[string]interface{}{
+			"error": err,
+		}, "Error when trying unmarshal data")
+		return nil, err
+	}
+	logutil.LogObj.SetDebugLog(map[string]interface{}{
+		"response": resp,
+	}, "Log response")
+	return resp, nil
 }

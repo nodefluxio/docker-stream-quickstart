@@ -26,7 +26,7 @@ export default function ModalFeedback(props) {
       <Panel>
         <Text>{desc}</Text>
         {subDesc && <SubText>{subDesc}</SubText>}
-        <Button type="secondary" width="100%" onClick={() => manualClose()}>
+        <Button type="secondary" width="100%" onClick={manualClose}>
           THANKYOU
         </Button>
       </Panel>

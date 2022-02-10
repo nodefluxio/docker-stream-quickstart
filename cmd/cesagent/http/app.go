@@ -8,6 +8,7 @@ import (
 
 	logutil "gitlab.com/nodefluxio/goutils/pkg/log"
 	httphandler "gitlab.com/nodefluxio/vanilla-dashboard/cmd/cesagent/http/handler"
+	"gitlab.com/nodefluxio/vanilla-dashboard/internal/entity"
 	dbinfra "gitlab.com/nodefluxio/vanilla-dashboard/internal/infrastructure/db/psql"
 	"gitlab.com/nodefluxio/vanilla-dashboard/internal/interactor"
 	httpRepo "gitlab.com/nodefluxio/vanilla-dashboard/internal/repository/http"
@@ -17,17 +18,20 @@ import (
 
 // Options is cli arguments to start the app
 type Options struct {
-	LogLevel             string `validate:"required"`
-	AppPort              string
-	DatabaseHost         string `validate:"required"`
-	DatabaseUsername     string `validate:"required"`
-	DatabasePassword     string `validate:"required"`
-	DatabaseName         string `validate:"required"`
-	SyncPeriod           string `validate:"required"`
-	AgentName            string `validate:"required"`
-	CoordinatorURL       string `validate:"required"`
-	EnrollmentVanillaURL string `validate:"required"`
-	TotalEventSync       string `validate:"required"`
+	LogLevel                    string `validate:"required"`
+	AppPort                     string
+	DatabaseHost                string `validate:"required"`
+	DatabaseUsername            string `validate:"required"`
+	DatabasePassword            string `validate:"required"`
+	DatabaseName                string `validate:"required"`
+	DatabaseMaxIdleConn         string `validate:"required"`
+	DatabaseMaxOpenConn         string `validate:"required"`
+	DatabaseMaxLifetimeInMinute string `validate:"required"`
+	SyncPeriod                  string `validate:"required"`
+	AgentName                   string `validate:"required"`
+	CoordinatorURL              string `validate:"required"`
+	EnrollmentVanillaURL        string `validate:"required"`
+	TotalEventSync              string `validate:"required"`
 }
 
 func Start(opt *Options) {
@@ -59,7 +63,13 @@ func Start(opt *Options) {
 
 	// Initialize infrastuctures
 	// Psql database
-	psqlRepo := dbinfra.NewPsqlRepository(dbURL.String(), opt.LogLevel)
+	dbOption := &entity.PsqlDBConnOption{
+		URL:                 dbURL.String(),
+		MaxIdleConn:         opt.DatabaseMaxIdleConn,
+		MaxOpenConn:         opt.DatabaseMaxOpenConn,
+		MaxLifetimeInMinute: opt.DatabaseMaxLifetimeInMinute,
+	}
+	psqlRepo := dbinfra.NewPsqlRepository(dbOption, opt.LogLevel)
 	defer psqlRepo.Close()
 	latestTimestampRepo := psql.NewLatestTimestampRepository(psqlRepo)
 

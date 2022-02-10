@@ -31,6 +31,7 @@ import (
 // ServiceImpl struct to represent quota transaction service
 type ServiceImpl struct {
 	EnrolledFaceRepo     repository.EnrolledFace
+	VehicleRepo          repository.Vehicle
 	FRemisRepo           repository.FRemis
 	WSHubRepo            repository.WSHub
 	URLGridLiteWS        string
@@ -38,6 +39,7 @@ type ServiceImpl struct {
 	EventRepo            repository.Event
 	StreamRepo           repository.Stream
 	GlobalSettingRepo    repository.GlobalSetting
+	SiteRepo             repository.Site
 }
 
 const (
@@ -74,7 +76,7 @@ func (s *ServiceImpl) readPump(client *entity.Client) {
 }
 
 // InitiateDataStream is a middleman between the websocket connection and the hub.
-func (s *ServiceImpl) InitiateDataStream(streamID string, conn *websocket.Conn) {
+func (s *ServiceImpl) InitiateDataStream(streamID string, nodeNum int, conn *websocket.Conn) {
 	client := &entity.Client{
 		Conn:     conn,
 		Send:     make(chan []byte, 256),
@@ -86,7 +88,7 @@ func (s *ServiceImpl) InitiateDataStream(streamID string, conn *websocket.Conn) 
 		client.Conn.Close()
 		logutil.LogObj.SetInfoLog(map[string]interface{}{}, "close conn and unregister client")
 	}()
-	url := s.URLGridLiteWS + "/0/" + streamID
+	url := fmt.Sprintf("%s/%d/%s", s.URLGridLiteWS, nodeNum, streamID)
 	gridLiteWS, _, err := websocket.DefaultDialer.Dial(url, nil)
 	logutil.LogObj.SetInfoLog(map[string]interface{}{"url": url}, "trying to established websocket connection...")
 	if err != nil {
@@ -152,6 +154,8 @@ func (s *ServiceImpl) sendMessage(message []byte, c *entity.Client) {
 		messageOut, _ = s.prepareDataPipelineCounting(&parsedMessage, messageOut)
 	case "LPR":
 		messageOut, _ = s.prepareDataPipelineLPR(&parsedMessage, messageOut)
+	case "CE":
+		messageOut, _ = s.prepareDataPipelineCrowdEstimation(&parsedMessage, messageOut)
 	}
 
 	nMsg, _ := json.Marshal(messageOut)
@@ -180,7 +184,8 @@ func (s *ServiceImpl) prepareDataWS(messageIn *entity.Message) (*entity.EventWeb
 		StreamID:       messageIn.StreamID,
 		Timestamp:      time.Unix(int64(messageIn.Timestamp), 0),
 		Location:       stream.StreamName,
-		Result:         messageIn.PrimaryText,
+		Label:          messageIn.PrimaryText,
+		Result:         messageIn.SecondaryText,
 	}
 	return &messageOut, nil
 }
@@ -210,10 +215,20 @@ func (s *ServiceImpl) prepareDataPipelineFR(messageIn *entity.Message, messageOu
 			return messageOut, err
 		}
 
-		if dataEnrolledFace.Name != "" {
+		if dataEnrolledFace != nil {
 			similarity := pipelineData["similarity"].(float64)
 			similarity = math.Floor(similarity*100) / 100
-			globalConf, _ := s.GlobalSettingRepo.GetCurrent(context.Background())
+			globalConf, err := s.GlobalSettingRepo.GetCurrent(context.Background())
+			if err != nil && err.Error() != "record not found" {
+				logutil.LogObj.SetErrorLog(map[string]interface{}{
+					"err": err,
+				},
+					"error when get global setting data")
+				return nil, err
+			}
+			if globalConf == nil {
+				globalConf = &entity.GlobalSetting{}
+			}
 			logutil.LogObj.SetInfoLog(map[string]interface{}{"detection_confidence": similarity, "global_config_similarity": globalConf.Similarity}, "checking similarity detection with config")
 			if similarity >= globalConf.Similarity {
 				nSimilarity := fmt.Sprintf("%.0f", similarity*100)
@@ -261,7 +276,26 @@ func (s *ServiceImpl) prepareDataPipelineLPR(messageIn *entity.Message, messageO
 
 	messageOut.PrimaryImage = plateImg.Bytes()
 	messageOut.Label = pipelineData["plate_number"].(string)
-	messageOut.Result = pipelineData["label"].(string)
+
+	vehicle, err := s.VehicleRepo.GetByPlateNumber(context.Background(), pipelineData["plate_number"].(string))
+	if err != nil {
+		logutil.LogObj.SetDebugLog(map[string]interface{}{
+			"err":           err,
+			"pipeline_data": pipelineData,
+		},
+			"error when get data with plate number")
+		messageOut.Result = pipelineData["label"].(string)
+		return messageOut, nil
+	}
+	messageOut.Result = pipelineData["label"].(string) + "-" + vehicle.Status + "-" + vehicle.Name
+
+	return messageOut, nil
+}
+
+func (s *ServiceImpl) prepareDataPipelineCrowdEstimation(messageIn *entity.Message, messageOut *entity.EventWebSocket) (*entity.EventWebSocket, error) {
+	pipelineData := messageIn.PipelineData.(map[string]interface{})
+	messageOut.Label = fmt.Sprintf("+/- %s", messageIn.PrimaryText)
+	messageOut.Result = pipelineData["area"].(string)
 
 	return messageOut, nil
 }
@@ -308,7 +342,7 @@ func (s *ServiceImpl) Dumping(ctx context.Context) {
 		done := make(chan struct{})
 		doneR := make(chan struct{})
 
-		url := s.URLGridLiteWS + "/0/"
+		url := s.URLGridLiteWS
 		logutil.LogObj.SetInfoLog(map[string]interface{}{"url": url}, "trying to established websocket connection...")
 		ctxDial, _ := context.WithTimeout(ctx, 10*time.Second)
 		gridLiteWS, _, err := websocket.DefaultDialer.DialContext(ctxDial, url, nil)
@@ -368,17 +402,17 @@ func (s *ServiceImpl) Dumping(ctx context.Context) {
 						return
 					}
 
-					dataEvent := &entity.Event{
-						EventType:      data.AnalyticID,
-						StreamID:       data.StreamID,
-						Detection:      data,
-						EventTime:      time.Unix(int64(data.Timestamp), 0),
-						SecondaryImage: buf.Bytes(),
-					}
 					analyticCode := strings.Split(data.AnalyticID, "-")
 					if len(analyticCode) < 2 {
 						logutil.LogObj.SetErrorLog(map[string]interface{}{"err": err}, "analytic id not valid")
 						return
+					}
+					dataEvent := &entity.Event{
+						EventType:      fmt.Sprintf("%s-%s", analyticCode[0], analyticCode[1]),
+						StreamID:       data.StreamID,
+						Detection:      data,
+						EventTime:      time.Unix(int64(data.Timestamp), 0),
+						SecondaryImage: buf.Bytes(),
 					}
 					switch analyticCode[1] {
 					case "FR":
@@ -406,6 +440,13 @@ func (s *ServiceImpl) Dumping(ctx context.Context) {
 						dataEvent, err = s.generateEventLPR(ctx, dataEvent, &data)
 						if err != nil {
 							logutil.LogObj.SetErrorLog(map[string]interface{}{"err": err}, "fail generate result LPR")
+							return
+						}
+
+					case "CE":
+						dataEvent, err = s.generateEventCrowdEstimation(ctx, dataEvent, &data)
+						if err != nil {
+							logutil.LogObj.SetErrorLog(map[string]interface{}{"err": err}, "fail generate result Crowd Estimation")
 							return
 						}
 
@@ -492,10 +533,20 @@ func (s *ServiceImpl) generateEventFR(ctx context.Context, data *entity.Event) (
 			return data, err
 		}
 
-		if dataEnrolledFace.Name != "" {
+		if dataEnrolledFace != nil {
 			similarity := pipelineData["similarity"].(float64)
 			similarity = math.Floor(similarity*100) / 100
-			globalConf, _ := s.GlobalSettingRepo.GetCurrent(ctx)
+			globalConf, err := s.GlobalSettingRepo.GetCurrent(ctx)
+			if err != nil && err.Error() != "record not found" {
+				logutil.LogObj.SetErrorLog(map[string]interface{}{
+					"err": err,
+				},
+					"error when get global setting data")
+				return nil, err
+			}
+			if globalConf == nil {
+				globalConf = &entity.GlobalSetting{}
+			}
 			logutil.LogObj.SetInfoLog(map[string]interface{}{"detection_confidence": similarity, "global_config_similarity": globalConf.Similarity}, "checking similarity detection with config")
 			if similarity >= globalConf.Similarity {
 				nSimilarity := fmt.Sprintf("%.0f", similarity*100)
@@ -559,6 +610,7 @@ func (s *ServiceImpl) generateEventCounter(ctx context.Context, data *entity.Eve
 		return data, err
 	}
 	data.Result = nr
+	data.Status = pipelineData["label"].(string)
 	return data, nil
 }
 
@@ -575,7 +627,6 @@ func (s *ServiceImpl) generateEventLPR(ctx context.Context, data *entity.Event, 
 	result.Timestamp = data.EventTime
 	result.Label = pipelineData["plate_number"].(string)
 	result.Result = pipelineData["label"].(string)
-
 	pipelineBoundingBox := pipelineData["bounding_box"].(map[string]interface{})
 	boundingBox := imageprocessing.BoundingBox{
 		Top:    pipelineBoundingBox["top"].(float64),
@@ -583,13 +634,51 @@ func (s *ServiceImpl) generateEventLPR(ctx context.Context, data *entity.Event, 
 		Width:  pipelineBoundingBox["width"].(float64),
 		Height: pipelineBoundingBox["height"].(float64),
 	}
-
 	plateImg, err := imageprocessing.Base64toCroppedJpg(message.Image, &boundingBox)
 	if err != nil {
 		return data, nil
 	}
 
 	data.PrimaryImage = plateImg.Bytes()
+
+	vehicle, err := s.VehicleRepo.GetByPlateNumber(ctx, pipelineData["plate_number"].(string))
+	if err != nil {
+		logutil.LogObj.SetDebugLog(map[string]interface{}{
+			"err":           err,
+			"pipeline_data": pipelineData,
+		},
+			"error when get data with plate number")
+		nr, err := json.Marshal(result)
+		if err != nil {
+			return data, err
+		}
+		data.Result = nr
+		return data, nil
+	}
+	result.Result = result.Result + "-" + vehicle.Status + "-" + vehicle.Name
+	nr, err := json.Marshal(result)
+	if err != nil {
+		return data, err
+	}
+	data.Result = nr
+	data.Status = pipelineData["label"].(string)
+	return data, nil
+}
+
+func (s *ServiceImpl) generateEventCrowdEstimation(ctx context.Context, data *entity.Event, message *entity.Message) (*entity.Event, error) {
+	var result entity.EventResult
+	pipelineData := data.Detection.PipelineData.(map[string]interface{})
+
+	// get location name
+	stream, err := s.StreamRepo.GetDetail(ctx, data.Detection.NodeNum, data.Detection.StreamID)
+	if err != nil {
+		return data, err
+	}
+
+	result.Location = stream.StreamName
+	result.Label = fmt.Sprintf("+/- %s", data.Detection.PrimaryText)
+	result.Result = pipelineData["area"].(string)
+	result.Timestamp = data.EventTime
 
 	nr, err := json.Marshal(result)
 	if err != nil {
@@ -600,19 +689,80 @@ func (s *ServiceImpl) generateEventLPR(ctx context.Context, data *entity.Event, 
 }
 
 // GetHistory is function for get event history with pagination, filtering and searching
-func (s *ServiceImpl) GetHistory(ctx context.Context, paging *util.Pagination) (*presenter.EventHistoryPaging, error) {
-	totalData, err := s.EventRepo.Count(ctx, paging)
+func (s *ServiceImpl) GetHistory(ctx context.Context, lastID uint64, timezone string, paging *util.Pagination, userInfo *presenter.AuthInfoResponse) (*presenter.EventHistoryPaging, error) {
+	var result presenter.EventHistoryPaging
+	eventGroup := make([]*presenter.EventGroup, 0)
+
+	tzLocation, err := time.LoadLocation(timezone)
 	if err != nil {
 		logutil.LogObj.SetErrorLog(map[string]interface{}{
 			"err": err,
 		},
-			"error on count event history from repository")
+			"error when load time location")
 		return nil, err
 	}
-	pgDetail := paging.CreateProperties(totalData)
 
-	paging.Offset = pgDetail.Offset
-	event, err := s.EventRepo.Get(ctx, paging)
+	// check filter stream_id
+	isStreamIDFiltered := false
+	if len(paging.Filter["stream_id"]) > 0 {
+		isStreamIDFiltered = true
+	}
+
+	// apply role base check
+	var newStreamID string
+	switch userInfo.Role {
+	case string(entity.UserRoleOperator):
+		if len(userInfo.SiteID) == 0 {
+			logutil.LogObj.SetInfoLog(map[string]interface{}{
+				"site_id": userInfo.SiteID,
+			},
+				"this user not assigned to any site, returning empty event history")
+			var result presenter.EventHistoryPaging
+			result.Limit = paging.Limit
+			result.Events = eventGroup
+			return &result, nil
+		}
+		listStream, err := s.SiteRepo.GetSiteWithStream(ctx, userInfo.SiteID)
+		if err != nil {
+			logutil.LogObj.SetErrorLog(map[string]interface{}{
+				"site_id": userInfo.SiteID,
+				"err":     err,
+			},
+				"failed get list available stream id for this site")
+			return nil, err
+		}
+		var streamIDs []string
+		for _, allowedStream := range listStream {
+			streamIDs = append(streamIDs, allowedStream.StreamID)
+		}
+
+		// check if fillter applied
+		if isStreamIDFiltered {
+			filterStreamID := strings.Split(paging.Filter["stream_id"], ",")
+			var newFilterStreamID []string
+			for _, streamID := range filterStreamID {
+				checkAvailStream := util.ArrayStringAvailability(streamIDs, streamID)
+				if checkAvailStream {
+					newFilterStreamID = append(newFilterStreamID, streamID)
+				}
+			}
+			streamIDs = newFilterStreamID
+		}
+		if len(streamIDs) > 0 {
+			newStreamID = strings.Join(streamIDs, ",")
+		}
+	case string(entity.UserRoleSuperAdmin):
+		if isStreamIDFiltered {
+			newStreamID = paging.Filter["stream_id"]
+		}
+	}
+
+	// cast new data filter stream id
+	if newStreamID != "" {
+		paging.Filter["stream_id"] = newStreamID
+	}
+
+	event, err := s.EventRepo.GetWithLastID(ctx, lastID, paging)
 	if err != nil {
 		logutil.LogObj.SetErrorLog(map[string]interface{}{
 			"err": err,
@@ -622,7 +772,8 @@ func (s *ServiceImpl) GetHistory(ctx context.Context, paging *util.Pagination) (
 	}
 	output := make(map[string][]*presenter.EventData)
 	for _, v := range event {
-		date := v.EventTime.Format(dataLayout)
+		TzEventTime := v.EventTime.In(tzLocation)
+		date := TzEventTime.Format(dataLayout)
 		var res entity.EventResult
 		err := json.Unmarshal(v.Result, &res)
 		if err != nil {
@@ -630,15 +781,16 @@ func (s *ServiceImpl) GetHistory(ctx context.Context, paging *util.Pagination) (
 		}
 		output[date] = append(output[date], &presenter.EventData{
 			ID:             v.ID,
+			AnalyticID:     v.EventType,
 			PrimaryImage:   v.PrimaryImage,
 			SecondaryImage: v.SecondaryImage,
 			Label:          res.Label,
 			Result:         res.Result,
 			Location:       res.Location,
-			Timestamp:      res.Timestamp,
+			Timestamp:      TzEventTime,
 		})
 	}
-	eventGroup := make([]*presenter.EventGroup, 0)
+
 	for k, v := range output {
 		neg := &presenter.EventGroup{
 			Timestamp: k,
@@ -647,19 +799,24 @@ func (s *ServiceImpl) GetHistory(ctx context.Context, paging *util.Pagination) (
 		eventGroup = append(eventGroup, neg)
 	}
 
-	var result presenter.EventHistoryPaging
 	result.Limit = paging.Limit
-	result.TotalPage = pgDetail.TotalPage
-	result.TotalData = totalData
-	result.CurrentPage = pgDetail.CurrentPage
 	result.Events = eventGroup
 
 	return &result, nil
 }
 
-func (s *ServiceImpl) ExportEvent(ctx context.Context, paging *util.Pagination) error {
+// ExportEvent is function for export data event history
+func (s *ServiceImpl) ExportEvent(ctx context.Context, paging *util.Pagination, timezone string) error {
 	var totalProcess int = 10
 	var totalQueryPerProccess int = 1000
+	tzLocation, err := time.LoadLocation(timezone)
+	if err != nil {
+		logutil.LogObj.SetErrorLog(map[string]interface{}{
+			"err": err,
+		},
+			"error when load time location")
+		return err
+	}
 	exportStatus = entity.ExportEventStatusRunning
 
 	// empty dir
@@ -688,12 +845,13 @@ func (s *ServiceImpl) ExportEvent(ctx context.Context, paging *util.Pagination) 
 		pageList := []int{}
 		for j := 0; j < chunkSize; j++ {
 			pageList = append(pageList, tmpLastPage)
-			tmpLastPage += 1
+			tmpLastPage++
 		}
 		pageSegment = append(pageSegment, pageList)
 	}
 
 	logutil.LogObj.SetInfoLog(map[string]interface{}{
+		"timezone":          timezone,
 		"total_data":        totalData,
 		"total_page":        totalPage,
 		"chunk_size":        chunkSize,
@@ -731,7 +889,8 @@ func (s *ServiceImpl) ExportEvent(ctx context.Context, paging *util.Pagination) 
 					errorChannel <- true
 				}
 				for _, v := range event {
-					date := v.EventTime.Format(dataLayout)
+					eventTImeWTz := v.EventTime.In(tzLocation)
+					date := eventTImeWTz.Format(dataLayout)
 					groupDir := fmt.Sprintf("%s/images/%s", exportDir, date)
 					if _, err := os.Stat(groupDir); os.IsNotExist(err) {
 						os.MkdirAll(groupDir, os.ModeDir|0755)
@@ -809,7 +968,29 @@ func (s *ServiceImpl) ExportEvent(ctx context.Context, paging *util.Pagination) 
 				event, _ := s.EventRepo.GetWithoutImage(ctx, &newPaging)
 				eventExportItems := make([]*entity.ExportEventItem, 0)
 				for _, v := range event {
-					date := v.EventTime.Format(dataLayout)
+					eventTImeWTz := v.EventTime.In(tzLocation)
+					date := eventTImeWTz.Format(dataLayout)
+					var resultEvent entity.EventResult
+					err = json.Unmarshal(v.Result, &resultEvent)
+					if err != nil {
+						exportStatus = entity.ExportEventStatusError
+						logutil.LogObj.SetErrorLog(map[string]interface{}{
+							"err": err,
+						},
+							"failed unmarshal result event")
+						return
+					}
+					resultEvent.Timestamp = resultEvent.Timestamp.In(tzLocation)
+
+					newResult, err := json.Marshal(&resultEvent)
+					if err != nil {
+						exportStatus = entity.ExportEventStatusError
+						logutil.LogObj.SetErrorLog(map[string]interface{}{
+							"err": err,
+						},
+							"failed marshal result event")
+						return
+					}
 					eventExportItems = append(eventExportItems, &entity.ExportEventItem{
 						ID:             v.ID,
 						EventType:      v.EventType,
@@ -817,10 +998,10 @@ func (s *ServiceImpl) ExportEvent(ctx context.Context, paging *util.Pagination) 
 						PrimaryImage:   fmt.Sprintf("images/%s/image_primary_%s_%d.jpg", date, date, v.ID),
 						SecondaryImage: fmt.Sprintf("images/%s/image_secondary_%s_%d.jpg", date, date, v.ID),
 						Detection:      string(v.Detection),
-						Result:         string(v.Result),
+						Result:         string(newResult),
 						Status:         v.Status,
-						EventTime:      v.EventTime.Format(dateTimelayout),
-						CreatedAt:      v.CreatedAt.Format(dateTimelayout),
+						EventTime:      eventTImeWTz.Format(dateTimelayout),
+						CreatedAt:      v.CreatedAt.In(tzLocation).Format(dateTimelayout),
 					})
 				}
 				templateData := entity.ExportEventTemplate{
@@ -848,7 +1029,7 @@ func (s *ServiceImpl) ExportEvent(ctx context.Context, paging *util.Pagination) 
 				}
 				logutil.LogObj.SetInfoLog(map[string]interface{}{"topic": "export-event-history"}, "finished parse data export event histroy to html file")
 				appZipper := zipper.NewZipper()
-				err = appZipper.Create(ctx, exportDir, "./tmp/exported_event.zip")
+				_, err = appZipper.Create(ctx, exportDir, "./tmp/exported_event.zip")
 				if err != nil {
 					exportStatus = entity.ExportEventStatusError
 					logutil.LogObj.SetErrorLog(map[string]interface{}{"topic": "export-event-history"}, "failed compress file")
@@ -895,4 +1076,36 @@ func (s *ServiceImpl) CheckExportedEvent(ctx context.Context) (string, error) {
 func (s *ServiceImpl) UpdateStatusExportDownload(ctx context.Context) error {
 	exportStatus = entity.ExportEventStatusDownloaded
 	return nil
+}
+
+func (s *ServiceImpl) GetEventInsight(ctx context.Context, data *entity.EventInsight) (*presenter.EventInsightData, error) {
+
+	data.TimeDeffinition = "today"
+	dataToday, err := s.EventRepo.GetInsight(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	data.TimeDeffinition = "yesterday"
+	dataYesterday, err := s.EventRepo.GetInsight(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	data.TimeDeffinition = "week"
+	dataWeek, err := s.EventRepo.GetInsight(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	data.TimeDeffinition = "month"
+	dataMonth, err := s.EventRepo.GetInsight(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &presenter.EventInsightData{
+		TotalToday:     dataToday.Total,
+		TotalYesterday: dataYesterday.Total,
+		TotalWeek:      dataWeek.Total,
+		TotalMonth:     dataMonth.Total,
+	}, err
+
 }

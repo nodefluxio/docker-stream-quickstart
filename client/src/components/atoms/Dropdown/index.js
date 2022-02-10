@@ -108,6 +108,7 @@ const WrapDropdown = styled.div`
 `;
 
 const MenuItemList = styled.div`
+  min-width: 100px;
   width: 100%;
   display: flex;
   align-items: center;

@@ -47,6 +47,7 @@ RUN go get -v ./cmd/vanend
 RUN CGO_ENABLED=0 GOOS=linux go build -o /go/bin/vanend -i ./cmd/vanend
 RUN CGO_ENABLED=0 GOOS=linux go build -o /go/bin/cescoordinator -i ./cmd/cescoordinator
 RUN CGO_ENABLED=0 GOOS=linux go build -o /go/bin/cesagent -i ./cmd/cesagent
+RUN CGO_ENABLED=0 GOOS=linux go build -o /go/bin/searchingpolri -i ./cmd/searchingpolri
 
 # final stage
 FROM frolvlad/alpine-glibc
@@ -58,10 +59,11 @@ RUN chmod +x /go/bin/dbmate
 RUN cp /go/bin/dbmate /bin/
 RUN yarn global add dotenv-to-json @ethical-jobs/dynamic-env
 COPY --from=build-frontend /opt/app/build  /go/bin
-COPY --from=build-frontend /opt/app/.env.example /go/bin/.env.example
+COPY --from=build-frontend /opt/app/.env.build /go/bin/.env.example
 COPY --from=build-backend /go/bin/vanend /go/bin/vanend
 COPY --from=build-backend /go/bin/cescoordinator /go/bin/cescoordinator
 COPY --from=build-backend /go/bin/cesagent /go/bin/cesagent
+COPY --from=build-backend /go/bin/searchingpolri /go/bin/searchingpolri
 COPY --from=build-backend /go/src/gitlab.com/nodefluxio/vanilla-dashboard/template /go/bin/template/
 COPY --from=build-backend /go/src/gitlab.com/nodefluxio/vanilla-dashboard/script /go/bin/script/
 COPY --from=build-backend /go/src/gitlab.com/nodefluxio/vanilla-dashboard/internal/infrastructure/db/psql/migrations /go/bin/internal/infrastructure/db/psql/migrations/

@@ -57,6 +57,24 @@ var flags = []cli.Flag{
 		EnvVar: "DB_NAME",
 	},
 	cli.StringFlag{
+		Name:   "db-max-idle, dbmi",
+		Value:  "4",
+		Usage:  "postgreSQL database max idle connection",
+		EnvVar: "DB_MAX_IDLE_CONNECTION",
+	},
+	cli.StringFlag{
+		Name:   "db-max-open, dbmc",
+		Value:  "8",
+		Usage:  "postgreSQL database max open connection",
+		EnvVar: "DB_MAX_OPEN_CONNECTION",
+	},
+	cli.StringFlag{
+		Name:   "db-max-lifetime, dbmt",
+		Value:  "5",
+		Usage:  "postgreSQL database max connection lifetime in minute",
+		EnvVar: "DB_CONNECTION_MAX_LIFETIME_IN_MINUTE",
+	},
+	cli.StringFlag{
 		Name:   "fremisn-url, frnurl",
 		Value:  "http://localhost:4005/v1/face",
 		Usage:  "fremisn service url, ex: http://localhost:4005/v1/face",
@@ -90,7 +108,7 @@ var flags = []cli.Flag{
 		Name:   "use-ces",
 		Value:  "false",
 		Usage:  "activate CES (Centralize Enrollment System)",
-		EnvVar: "USER_CES",
+		EnvVar: "USE_CES",
 	},
 	cli.StringFlag{
 		Name:   "agent-url",
@@ -108,21 +126,24 @@ var flags = []cli.Flag{
 
 func action(c *cli.Context) {
 	options := vanend.Options{
-		LogLevel:               c.String("log"),
-		FEAppHost:              c.String("website-host"),
-		AppPort:                c.String("port"),
-		NodeEnv:                c.String("node-env"),
-		DatabaseHost:           c.String("db-host"),
-		DatabaseUsername:       c.String("db-user"),
-		DatabasePassword:       c.String("db-password"),
-		DatabaseName:           c.String("db-name"),
-		FremisnURL:             c.String("fremisn-url"),
-		FremisKeyspace:         c.String("fremisn-keyspace"),
-		VisionaireHost:         c.String("visionaire-host"),
-		CronjobPartitionSpec:   c.String("cron-partition"),
-		UseCES:                 c.String("use-ces"),
-		AgentURL:               c.String("agent-url"),
-		MaxSizeImageEnrollment: c.String("max-size-img-enrollment"),
+		LogLevel:                    c.String("log"),
+		FEAppHost:                   c.String("website-host"),
+		AppPort:                     c.String("port"),
+		NodeEnv:                     c.String("node-env"),
+		DatabaseHost:                c.String("db-host"),
+		DatabaseUsername:            c.String("db-user"),
+		DatabasePassword:            c.String("db-password"),
+		DatabaseName:                c.String("db-name"),
+		DatabaseMaxIdleConn:         c.String("db-max-idle"),
+		DatabaseMaxOpenConn:         c.String("db-max-open"),
+		DatabaseMaxLifetimeInMinute: c.String("db-max-lifetime"),
+		FremisnURL:                  c.String("fremisn-url"),
+		FremisKeyspace:              c.String("fremisn-keyspace"),
+		VisionaireHost:              c.String("visionaire-host"),
+		CronjobPartitionSpec:        c.String("cron-partition"),
+		UseCES:                      c.String("use-ces"),
+		AgentURL:                    c.String("agent-url"),
+		MaxSizeImageEnrollment:      c.String("max-size-img-enrollment"),
 	}
 	logutil.Init(options.LogLevel)
 	validate := validator.New()

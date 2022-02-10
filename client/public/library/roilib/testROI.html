@@ -1,0 +1,88 @@
+<html>
+    <head>
+        <script src="../d3/d3.min.js"></script>
+        <script src="drawROI.js"></script>
+        <style>
+            #canvas {
+                background-color: black;
+                position: relative;
+                overflow: hidden;
+                z-index: 10;
+            }
+            #canvas > img{
+                position: absolute;
+                z-index: -10;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 100%;
+            }
+            #canvas .no{
+                cursor: default;
+            }
+            #canvas .initial{
+                cursor: cell;
+            }
+            #canvas .drawing{
+                cursor: none;
+            }
+            #canvas > svg{
+                border: none;
+                user-select: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="roi-container">
+            <select name="roi-type" id="roi-type" onchange="onTypeChange()">
+                <option value="line">Line</option>
+                <option value="region">Region</option>
+            </select>
+            <button onclick="onDraw()">draw</button>
+            <button onclick="onReset()">reset</button>
+            <div>
+                <input id="line-id" name="id" />
+                <button onclick="onDelete(document.getElementById('line-id').value)">delete</button>
+                <button id="reverse-button" onclick="onReverse(document.getElementById('line-id').value)">reverse</button>
+            </div>
+            <br />
+            <div id ="canvas" class="no" style="width: 800px; height: 700px">
+                <img src="./test.jpg" alt="bg test">
+            </div>
+        </div>
+        <script>
+            function lineValue(value) {
+                console.log(value);
+            }
+            function onDraw() {
+                document.getElementById("canvas").className = "initial";
+            };
+            function onReset(){
+                window.onResetROI(() => console.log("reset")    )
+            }
+            function onDelete(id){
+                const type = document.getElementById('roi-type').value;
+                if (type === "line") {
+                    window.onDeleteLine(id);
+                } else if (type === "region") {
+                    window.onDeleteRegion(id);
+                }
+            }
+            function onReverse(id) {
+                window.onReverseLine(id);
+            }
+            function onTypeChange(){
+                const type = document.getElementById('roi-type').value;
+                if (type === "line") {
+                    document.getElementById("reverse-button").style.display = "inline-block";
+                } else if (type === "region") {
+                    document.getElementById("reverse-button").style.display = "none";
+                }
+                window.initialCanvas(lineValue, type);
+            }
+            window.onload = (event) => {
+                onTypeChange();
+            };
+        </script>
+    </body>
+</html>

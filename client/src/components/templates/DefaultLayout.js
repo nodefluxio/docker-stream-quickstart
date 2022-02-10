@@ -44,11 +44,11 @@ function DefaultLayout(props) {
         </Layout>
         <Modal
           desc={popupFeedback.desc || ""}
+          subDesc={popupFeedback.subDesc || ""}
           type="feedback"
           status={popupFeedback.type}
-          onclose={() => closeNotifFeedback}
           isOpen={popupFeedback.show}
-          manualClose={() => closeNotifFeedback}
+          manualClose={() => closeNotifFeedback()}
           duration={3000}
         />
       </Main>

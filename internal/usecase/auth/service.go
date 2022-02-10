@@ -10,4 +10,5 @@ import (
 type Service interface {
 	Login(ctx context.Context, input *presenter.LoginInput) (*presenter.LoginResponse, error)
 	RefreshToken(ctx context.Context, postData *presenter.LoginResponse) (*presenter.LoginResponse, error)
+	GetInfoAuthToken(ctx context.Context, token string) (*presenter.AuthInfoResponse, error)
 }

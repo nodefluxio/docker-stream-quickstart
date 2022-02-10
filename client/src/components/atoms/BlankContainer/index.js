@@ -7,7 +7,10 @@ const BlankContainer = Styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  ${({ bg }) => `background: url(${bg}) no-repeat center center;`};
+  ${({ bg }) => `background: url(${bg}) no-repeat center center;`}
+  ${({ backgroundColor }) => `background-color: ${backgroundColor};`}
+  ${({ position }) => `position: ${position};`}
+  ${({ top }) => `top: ${top};`}
 `;
 
 export default BlankContainer;

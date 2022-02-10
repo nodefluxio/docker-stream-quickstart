@@ -6,7 +6,12 @@ import {
 export const showGeneralNotification = data => ({
   type: SHOW_GENERAL_NOTIFICATION,
   payload: {
-    result: { show: true, type: data.type, desc: data.desc }
+    result: {
+      show: true,
+      type: data.type,
+      desc: data.desc,
+      subDesc: data.subDesc
+    }
   }
 });
 

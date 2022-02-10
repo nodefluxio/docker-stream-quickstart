@@ -19,8 +19,16 @@ func NewLatestTimestampRepository(conn *gorm.DB) repository.LatestTimestamp {
 	}
 }
 func (p *psqlLatestTimestampRepo) CreateOrUpdate(ctx context.Context, data *entity.LatestTimestamp) error {
-	if p.Conn.Table("latest_timestamp").Update("timestamp", data.Timestamp).RowsAffected == 0 {
-		p.Conn.Save(data)
+	update := p.Conn.Table("latest_timestamp").Update("timestamp", data.Timestamp)
+	err := update.Error
+	if err != nil {
+		return err
+	}
+	if update.RowsAffected == 0 {
+		err = p.Conn.Save(data).Error
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -70,6 +70,9 @@ func (p *psqlEventEnrollmentRepo) Get(ctx context.Context, paging *util.Paginati
 	}
 	tx = tx.Order("created_at ASC")
 	err := tx.Find(&data).Error
+	if err != nil {
+		return nil, err
+	}
 	return data, err
 }
 

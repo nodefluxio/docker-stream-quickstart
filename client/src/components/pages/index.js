@@ -5,8 +5,10 @@ import Page404 from "./404";
 import Event from "./event";
 import Assignment from "./assignment";
 import Login from "./login";
+import Vehicle from "./Vehicle";
 import Plugin from "./plugin";
 import License from "./license";
+import Account from "./account";
 
 export {
   Camera,
@@ -16,6 +18,8 @@ export {
   Event,
   Assignment,
   Login,
+  Vehicle,
   Plugin,
-  License
+  License,
+  Account
 };

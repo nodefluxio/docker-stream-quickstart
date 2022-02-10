@@ -14,12 +14,12 @@ type CoordinatorRequest struct {
 }
 
 type CoordinatorResponse struct {
-	EventID     string                 `json:"event_id"`
-	Agent       string                 `json:"agent"`
-	EventAction string                 `json:"event_action"`
-	Images      []string               `json:"images"`
-	Payload     EventEnrollmentPayload `json:"payload"`
-	CreatedAt   time.Time              `json:"created_at"`
+	EventID     string      `json:"event_id"`
+	Agent       string      `json:"agent"`
+	EventAction string      `json:"event_action"`
+	Images      []string    `json:"images"`
+	Payload     interface{} `json:"payload"`
+	CreatedAt   time.Time   `json:"created_at"`
 }
 
 // EventEnrollmentPayload is payload from enrollment event

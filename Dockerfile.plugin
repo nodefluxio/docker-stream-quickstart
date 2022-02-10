@@ -6,7 +6,7 @@ RUN \
   apk update && \
   apk add git python make gcc g++
 
-ADD ./plugin/search-dukcapil /opt/app
+ADD ./plugin/search /opt/app
 WORKDIR /opt/app
 
 RUN \
@@ -14,10 +14,11 @@ RUN \
   yarn run build
 
 FROM nginx:alpine
-RUN apk add --no-cache nodejs-current jq bash
+RUN apk add --no-cache nodejs-current bash
 COPY --from=build-plugin /opt/app/build /var/www
-COPY --from=build-plugin /opt/app/.env.example /var/www/.env.example
+COPY --from=build-plugin /opt/app/env.sh /var/www/env.sh
+COPY --from=build-plugin /opt/app/.env.example /var/www/.env
 COPY --from=build-plugin /opt/app/default.conf /etc/nginx/conf.d/default.conf
 WORKDIR /var/www
 EXPOSE 80
-CMD ["/bin/bash", "-c", "nginx -g \"daemon off;\""]
+CMD ["/bin/bash", "-c", "/var/www/env.sh && nginx -g \"daemon off;\""]

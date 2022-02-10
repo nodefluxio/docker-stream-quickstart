@@ -16,7 +16,9 @@ function AddCamera(props) {
     stream_name: "",
     stream_address: "",
     stream_longitude: 0,
-    stream_latitude: 0
+    stream_latitude: 0,
+    stream_site: "",
+    stream_brand: ""
   };
   const [formData, setFormData] = useState(formSchema);
   const [loading, setLoading] = useState(false);
@@ -62,6 +64,36 @@ function AddCamera(props) {
     setFormData(formSchema);
   }, [openModal]);
 
+  function renderForm(name) {
+    switch (name) {
+      case "stream_address":
+        return (
+          <Input
+            key={name}
+            label="Source"
+            type="textarea"
+            id="source_field"
+            height="232px"
+            width="345px"
+            value={formData[name]}
+            name="stream_address"
+            onChange={handleChange}
+          ></Input>
+        );
+      default:
+        return (
+          <EditableInput
+            key={name}
+            label={formatLabel(name)}
+            id={name}
+            onChange={handleChange}
+            name={name}
+            value={formData[name]}
+          ></EditableInput>
+        );
+    }
+  }
+
   return (
     <Modal
       show={openModal}
@@ -71,32 +103,7 @@ function AddCamera(props) {
       padding="20px"
     >
       {error && <Text color={themeContext.theme.inlineError}>{error}</Text>}
-      <FormRow>
-        {Object.keys(formData).map(key =>
-          key !== "stream_address" ? (
-            <EditableInput
-              key={key}
-              label={formatLabel(key)}
-              id={key}
-              onChange={handleChange}
-              name={key}
-              value={formData[key]}
-            ></EditableInput>
-          ) : (
-            <Input
-              key={key}
-              label="Source"
-              type="textarea"
-              id="source_field"
-              height="232px"
-              width="345px"
-              value={formData.stream_address}
-              name="stream_address"
-              onChange={handleChange}
-            ></Input>
-          )
-        )}
-      </FormRow>
+      <FormRow>{Object.keys(formData).map(key => renderForm(key))}</FormRow>
       <Button
         width="100%"
         style={{ marginTop: "20px" }}

@@ -8,6 +8,7 @@ import (
 
 	logutil "gitlab.com/nodefluxio/goutils/pkg/log"
 	httphandler "gitlab.com/nodefluxio/vanilla-dashboard/cmd/cescoordinator/http/handler"
+	"gitlab.com/nodefluxio/vanilla-dashboard/internal/entity"
 	dbinfra "gitlab.com/nodefluxio/vanilla-dashboard/internal/infrastructure/db/psql"
 	"gitlab.com/nodefluxio/vanilla-dashboard/internal/interactor"
 	"gitlab.com/nodefluxio/vanilla-dashboard/internal/repository/psql"
@@ -16,13 +17,16 @@ import (
 
 // Options is cli arguments to start the app
 type Options struct {
-	LogLevel             string `validate:"required"`
-	AppPort              string
-	DatabaseHost         string `validate:"required"`
-	DatabaseUsername     string `validate:"required"`
-	DatabasePassword     string `validate:"required"`
-	DatabaseName         string `validate:"required"`
-	CronjobPartitionSpec string `validate:"required"`
+	LogLevel                    string `validate:"required"`
+	AppPort                     string
+	DatabaseHost                string `validate:"required"`
+	DatabaseUsername            string `validate:"required"`
+	DatabasePassword            string `validate:"required"`
+	DatabaseName                string `validate:"required"`
+	DatabaseMaxIdleConn         string `validate:"required"`
+	DatabaseMaxOpenConn         string `validate:"required"`
+	DatabaseMaxLifetimeInMinute string `validate:"required"`
+	CronjobPartitionSpec        string `validate:"required"`
 }
 
 func Start(opt *Options) {
@@ -54,7 +58,13 @@ func Start(opt *Options) {
 
 	// Initialize infrastuctures
 	// Psql database
-	psqlRepo := dbinfra.NewPsqlRepository(dbURL.String(), opt.LogLevel)
+	dbOption := &entity.PsqlDBConnOption{
+		URL:                 dbURL.String(),
+		MaxIdleConn:         opt.DatabaseMaxIdleConn,
+		MaxOpenConn:         opt.DatabaseMaxOpenConn,
+		MaxLifetimeInMinute: opt.DatabaseMaxLifetimeInMinute,
+	}
+	psqlRepo := dbinfra.NewPsqlRepository(dbOption, opt.LogLevel)
 	defer psqlRepo.Close()
 	eventEnrollmentRepo := psql.NewEventEnrollmentRepository(psqlRepo)
 	eventEnrollmentFaceImageRepo := psql.NewEventEnrollmentFaceImageRepository(psqlRepo)

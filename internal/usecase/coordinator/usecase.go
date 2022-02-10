@@ -89,7 +89,7 @@ func (s *ServiceImpl) Get(ctx context.Context, paging *util.Pagination) ([]*pres
 	data, err := s.EventEnrollmentRepo.Get(ctx, paging)
 
 	for _, v := range data {
-		var dataPayload presenter.EventEnrollmentPayload
+		var dataPayload map[string]interface{}
 		err = json.Unmarshal(v.Payload, &dataPayload)
 		if err != nil {
 			return result, err

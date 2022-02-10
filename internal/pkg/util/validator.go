@@ -1,6 +1,7 @@
 package util
 
 import (
+	"net/mail"
 	"reflect"
 	"sync"
 
@@ -52,4 +53,21 @@ func kindOfData(data interface{}) reflect.Kind {
 		valueType = value.Elem().Kind()
 	}
 	return valueType
+}
+
+// EmailValidator is utility for checking this string is email or not
+func EmailValidator(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+// ArrayStringAvailability is utility for check is this string cointain in the array or not
+func ArrayStringAvailability(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
 }

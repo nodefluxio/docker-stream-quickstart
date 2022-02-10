@@ -24,6 +24,13 @@ export function dateToIso(time) {
   return dateIso;
 }
 
+export function getDateFormat(time) {
+  const dateIso = dayjs(time)
+    .tz(localOffset)
+    .format("YYYY-MM-DD");
+  return dateIso;
+}
+
 export function isoToDate(time) {
   const isoDate = new Date(dayjs(time).format(dateInterFormat));
   return isoDate;

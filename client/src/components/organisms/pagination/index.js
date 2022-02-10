@@ -53,6 +53,7 @@ function PaginationWrapper(props) {
         </PageIndicatorWrapper>
         <ButtonWrapper>
           <IconPlaceHolder
+            hover={true}
             borderColor={themeContext.secondary2}
             disable={page === 1}
             onClick={() => (page === 1 ? {} : changePage(1))}
@@ -60,6 +61,7 @@ function PaginationWrapper(props) {
             <img src={DoubleLeft} alt="first-page" />
           </IconPlaceHolder>
           <IconPlaceHolder
+            hover={true}
             borderColor={themeContext.secondary2}
             disable={page === 1}
             onClick={() => (page === 1 ? {} : changePage(page - 1))}
@@ -67,6 +69,7 @@ function PaginationWrapper(props) {
             <img src={ArrowLeft} alt="prev-page" />
           </IconPlaceHolder>
           <IconPlaceHolder
+            hover={true}
             borderColor={themeContext.secondary2}
             disable={page === totalPage}
             onClick={() => (page === totalPage ? {} : changePage(page + 1))}
@@ -75,6 +78,7 @@ function PaginationWrapper(props) {
             <img src={ArrowLeft} alt="next-page" />
           </IconPlaceHolder>
           <IconPlaceHolder
+            hover={true}
             borderColor={themeContext.secondary2}
             disable={page === totalPage}
             onClick={() => (page === totalPage ? {} : changePage(totalPage))}

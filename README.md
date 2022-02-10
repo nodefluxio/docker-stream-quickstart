@@ -1,13 +1,13 @@
-# Vanilla Dashboard for Docker Stream
+# Vanilla-Dashboard
 
-This is the source code of Vanilla Dashboard for developer to learn how develop dashboard on top ov Docker Stream component; visionaire4 and fremis-n.
+## Do not edit .env.build if not necessary
 
 ## Features
 
-This is list of all feature that is available on vanilla dashboard. Feature listed below have their own page.
+This is list of all feature that is available on vanilla dashboard. Feature listed below have their own page. You can see the source code of these pages in [**here**](https://gitlab.com/nodefluxio/vanilla-dashboard/-/tree/master/client/src/components/pages)
 
 API Documentation:
-- Stream/Camera related API : https://docs.nodeflux.io/visionaire-docker-stream/developer-guide/apis
+- Stream/Camera related API : https://docs.nodeflux.io/visionaire-docker-stream/integration-point
 
 - Enrollment API: https://gitlab.com/nodefluxio/vanilla-dashboard/-/blob/master/contract.md
 

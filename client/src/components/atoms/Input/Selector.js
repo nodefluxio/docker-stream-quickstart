@@ -2,6 +2,7 @@ import React from "react";
 import PropTypes from "prop-types";
 import styled from "styled-components";
 import SelectInput from "react-select";
+import CreatableSelect from "react-select/creatable";
 
 import theme from "theme";
 
@@ -48,11 +49,10 @@ const customStyles = {
     ...provided,
     width: "100%",
     backgroundColor: "transparent",
-    height: 40,
     borderStyle: "solid",
     borderWidth: 2,
     borderRadius: 8,
-    borderColor: state.isFocused ? theme.mint : theme.secondary1,
+    borderColor: state.isFocused ? theme.mint : theme.secondary2,
     boxShadow: "none",
     ":hover": {
       borderColor: theme.mint
@@ -68,38 +68,73 @@ const customStyles = {
     return { ...style };
   },
 
+  multiValue: provided => ({
+    ...provided,
+    backgroundColor: "#372463"
+  }),
+
+  multiValueLabel: provided => ({
+    ...provided,
+    color: "white"
+  }),
+
   input: () => ({
     color: theme.mercury
   })
 };
 
-export default function Select({
-  option,
-  label,
-  error,
-  name,
-  value,
-  onChange,
-  placeholder
-}) {
+export default function Select(props) {
+  const {
+    option,
+    label,
+    error,
+    name,
+    value,
+    onChange,
+    placeholder,
+    style,
+    isCreatable,
+    isMulti,
+    ...generalProps
+  } = props;
   const indexInput = option.findIndex(x => x.value === value);
   const handleChange = selectedOption => {
-    onChange({
-      target: { value: selectedOption.value, name }
-    });
+    if (Array.isArray(selectedOption)) {
+      onChange(selectedOption);
+    } else {
+      onChange({
+        target: { value: selectedOption.value, name }
+      });
+    }
   };
+  const defaultValue = isMulti ? value : option[indexInput];
   return (
-    <WrapSelect>
+    <WrapSelect style={style}>
       {label && <InputLabel>{label}</InputLabel>}
-      <SelectInput
-        options={option}
-        styles={customStyles}
-        error={error}
-        value={option[indexInput] || ""}
-        name={name}
-        onChange={handleChange}
-        placeholder={placeholder}
-      />
+      {isCreatable ? (
+        <CreatableSelect
+          isCreatable
+          options={option}
+          styles={customStyles}
+          error={error}
+          value={defaultValue || ""}
+          name={name}
+          onChange={handleChange}
+          placeholder={placeholder}
+          {...generalProps}
+        />
+      ) : (
+        <SelectInput
+          options={option}
+          styles={customStyles}
+          error={error}
+          value={defaultValue || ""}
+          name={name}
+          onChange={handleChange}
+          placeholder={placeholder}
+          isMulti={isMulti}
+        />
+      )}
       {error && <InputError>{error}</InputError>}
     </WrapSelect>
   );
@@ -113,7 +148,9 @@ Select.propTypes = {
   onChange: PropTypes.func,
   name: PropTypes.string,
   value: PropTypes.any,
-  placeholder: PropTypes.string
+  placeholder: PropTypes.string,
+  isCreatable: PropTypes.bool,
+  isMulti: PropTypes.bool
 };
 
 Select.defaultProps = {
@@ -124,7 +161,9 @@ Select.defaultProps = {
   onChange: () => {},
   name: "",
   value: "",
-  placeholder: "Select"
+  placeholder: "Select",
+  isCreatable: false,
+  isMulti: false
 };
 
 const WrapSelect = styled.div`

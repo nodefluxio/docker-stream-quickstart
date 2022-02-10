@@ -1,4 +1,4 @@
-package httphandler
+package handler
 
 import (
 	"github.com/gin-contrib/cors"
@@ -7,7 +7,20 @@ import (
 
 // New returns http handler
 func New() *gin.Engine {
-	router := gin.New()
+	router := gin.Default()
+	// will use for futher development
+	// router.Use(cors.Default())
+	// router.Use(cors.New(cors.Config{
+	// 	AllowOrigins:     []string{"*"},
+	// 	AllowMethods:     []string{"*"},
+	// 	AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+	// 	ExposeHeaders:    []string{"Content-Length"},
+	// 	AllowCredentials: true,
+	// 	// AllowOriginFunc: func(origin string) bool {
+	// 	// 	return origin == "https://github.com"
+	// 	// },
+	// 	MaxAge: 12 * time.Hour,
+	// }))
 	router.Use(cors.New(configureMiddleware()))
 	router.Use(gin.Logger())
 

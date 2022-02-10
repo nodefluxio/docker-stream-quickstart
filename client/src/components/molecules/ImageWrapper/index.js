@@ -3,28 +3,30 @@ import PropTypes from "prop-types";
 import Styled from "styled-components";
 import Dropdown from "components/atoms/Dropdown";
 
-import BrokenImage from "assets/icon/visionaire/broken-image.svg";
 import Setting from "assets/icon/visionaire/more.svg";
 
 export default function ImageOption(props) {
   const { id, refreshInterval, fetchUrl } = props;
   const [image, setImage] = useState("");
   const [sizeCover, setSizeCover] = useState(false);
+  const [isImgValid, setIsImgValid] = useState(false);
 
   function getImageData() {
     fetchUrl(id)
       .then(result => {
+        // eslint-disable-next-line no-console
+        console.log("result :", result);
         if (result.size > 0) {
           const resultURL = URL.createObjectURL(result);
           setImage(resultURL);
           setSizeCover(true);
         } else {
-          setImage(BrokenImage);
+          setIsImgValid(true);
           setSizeCover(false);
         }
       })
       .catch(() => {
-        setImage(BrokenImage);
+        setIsImgValid(true);
         setSizeCover(false);
       });
   }
@@ -84,6 +86,9 @@ export default function ImageOption(props) {
           <img src={overlayIcon} alt="overlay-icon" />
         </OverlayWrapper>
       )}
+      {isImgValid && (
+        <TextNotFound height={height}>Stream Not Found</TextNotFound>
+      )}
       <ClickableArea onClick={onClick} />
       {children}
     </ImageWrapper>
@@ -97,7 +102,7 @@ ImageOption.propTypes = {
   children: PropTypes.element,
   width: PropTypes.string,
   height: PropTypes.string,
-  name: PropTypes.element,
+  name: PropTypes.oneOfType([PropTypes.element, PropTypes.string]),
   menu: PropTypes.element,
   maxheight: PropTypes.string,
   secondaryMenu: PropTypes.oneOfType([PropTypes.object, PropTypes.bool]),
@@ -119,6 +124,12 @@ ImageOption.defaultProps = {
   onClick: () => {}
 };
 
+const TextNotFound = Styled.div`
+    text-align: center;
+    vertical-align: middle;
+    line-height: ${props => props.height};
+    width: 100%;
+`;
 const ImageWrapper = Styled.div`
     display: flex;
     width: ${props => props.width};

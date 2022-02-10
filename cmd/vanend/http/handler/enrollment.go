@@ -1,9 +1,12 @@
-package httphandler
+package handler
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -63,12 +66,44 @@ func (h *EnrollmentHandler) GetDetail(c *gin.Context) {
 	})
 }
 
+//Backup for get detail data enrollment
+func (h *EnrollmentHandler) Backup(c *gin.Context) {
+	backupFile, err := h.EnrollmentSvc.Backup(c)
+	csvFilePath := fmt.Sprintf("%s/%s", filepath.Dir(backupFile.Name()), backupFile.Name())
+	file, err := os.Open(csvFilePath) //Create a file
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+			"ok":      false,
+			"code":    "not-found",
+			"errors":  []string{err.Error()},
+			"message": "Error when trying to backup enrollment data",
+		})
+		return
+	}
+	defer file.Close()
+	c.Writer.Header().Add("Content-Type", "application/octet-stream")
+	c.Writer.Header().Add("Content-Disposition", "attachment; filename="+backupFile.Name())
+	_, err = io.Copy(c.Writer, file)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+			"ok":      false,
+			"code":    "not-found",
+			"errors":  []string{err.Error()},
+			"message": "Error when trying to backup enrollment data",
+		})
+		return
+	}
+}
+
 // Create for add enrollment
 func (h *EnrollmentHandler) Create(c *gin.Context) {
 	name := c.Request.PostFormValue("name")
 	identityNumber := c.Request.PostFormValue("identity_number")
 	status := c.Request.PostFormValue("status")
 	faceID := c.Request.PostFormValue("face_id")
+	gender := c.Request.PostFormValue("gender")
+	birthPlace := c.Request.PostFormValue("birth_place")
+	birthDate := c.Request.PostFormValue("birth_date")
 	isAgent := c.GetHeader("Is-Agent")
 
 	form, _ := c.MultipartForm()
@@ -113,6 +148,9 @@ func (h *EnrollmentHandler) Create(c *gin.Context) {
 		Images:         nImages,
 		Name:           name,
 		IdentityNumber: identityNumber,
+		Gender:         gender,
+		BirthPlace:     birthPlace,
+		BirthDate:      birthDate,
 		Status:         status,
 		FaceID:         faceID,
 	}
@@ -192,6 +230,10 @@ func (h *EnrollmentHandler) Update(c *gin.Context) {
 	name := c.Request.PostFormValue("name")
 	identityNumber := c.Request.PostFormValue("identity_number")
 	status := c.Request.PostFormValue("status")
+	gender := c.Request.PostFormValue("gender")
+	birthPlace := c.Request.PostFormValue("birth_place")
+	birthDate := c.Request.PostFormValue("birth_date")
+	deletedVariations, _ := c.GetPostFormArray("deleted_variations")
 	form, _ := c.MultipartForm()
 	files := form.File["images"]
 	isAgent := c.GetHeader("Is-Agent")
@@ -224,10 +266,14 @@ func (h *EnrollmentHandler) Update(c *gin.Context) {
 
 	}
 	data := presenter.EnrollmentRequest{
-		Images:         nImages,
-		Name:           name,
-		IdentityNumber: identityNumber,
-		Status:         status,
+		Images:            nImages,
+		Name:              name,
+		IdentityNumber:    identityNumber,
+		Gender:            gender,
+		BirthPlace:        birthPlace,
+		BirthDate:         birthDate,
+		Status:            status,
+		DeletedVariations: deletedVariations,
 	}
 	errSvc := h.EnrollmentSvc.Update(c, id, &data, isAgent)
 	if errSvc != nil {

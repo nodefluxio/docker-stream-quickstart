@@ -16,6 +16,11 @@ export function createEnrollment(data) {
   return fetch(url, "post", data).then(result => result);
 }
 
+export function backupEnrollment() {
+  const url = `${REACT_APP_API_ENROLLMENT}/files/enrollment`;
+  return fetch(url, "get", null, "blob").then(result => result);
+}
+
 export function updateEnrollment(id, data) {
   const url = `${REACT_APP_API_ENROLLMENT}/enrollment/${id}`;
   return fetch(url, "put", data).then(result => result);

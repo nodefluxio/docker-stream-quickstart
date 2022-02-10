@@ -5,6 +5,7 @@ import { USE_CES, LONG_POLL_INTERVAL, REACT_APP_API_EVENT } from "config";
 import styled, { keyframes } from "styled-components";
 import theme from "theme";
 
+import { getResource } from "api";
 import { getStatus } from "store/actions/agent";
 import LinkButton from "components/atoms/LinkButton";
 import {
@@ -16,11 +17,14 @@ import IconPlaceholder from "components/atoms/IconPlaceholder";
 
 import DownloadIcon from "assets/icon/visionaire/download.svg";
 
-function Footer({ agent, exportEvent, history }) {
+const POINT_TO_PERCENTAGE = 100;
+
+function Footer({ agent, exportEvent }) {
   const [agentStatus, setAgentStatus] = useState(agent);
   const [eventButtonText, setEventButtonText] = useState("");
   const [showButton, setShowButton] = useState(false);
   const [showExportComponent, setShowExportComponent] = useState(false);
+  const [resources, setResources] = useState({});
   const dispatch = useDispatch();
   const downloadLink = useRef(null);
 
@@ -37,21 +41,58 @@ function Footer({ agent, exportEvent, history }) {
     }
   }
 
-  const menu = [
-    {
-      label: "License",
-      url: "/license"
-    }
-  ];
-
   useEffect(() => {
+    let interval = null;
     if (USE_CES) {
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         dispatch(getStatus());
       }, LONG_POLL_INTERVAL);
-      return () => clearInterval(interval);
     }
-    return null;
+    const intervalResource = setInterval(() => {
+      getResource()
+        .then(result => {
+          if (result.devices.length > 0) {
+            const { devices } = result;
+            if (devices[0].data) {
+              const { data } = devices[0];
+              setResources({
+                cpu: Number(data.cpu_percent.toFixed(2)),
+                gpu_util: Number(data.gpus[0].gpu_utilization.toFixed(2)),
+                ram: Number(data.ram_percent.toFixed(2)),
+                gpu_mem: Number(
+                  (
+                    (data.gpus[0].gpu_memory_used * POINT_TO_PERCENTAGE) /
+                    data.gpus[0].gpu_memory_total
+                  ).toFixed(2)
+                )
+              });
+            } else if (devices[0].gpus) {
+              const devicesData = devices[0];
+              setResources({
+                cpu: Number(devicesData.cpu_percent.toFixed(2)),
+                gpu_util: Number(
+                  devicesData.gpus[0].gpu_utilization.toFixed(2)
+                ),
+                ram: Number(devicesData.ram_percent.toFixed(2)),
+                gpu_mem: Number(
+                  (
+                    (devicesData.gpus[0].gpu_memory_used *
+                      POINT_TO_PERCENTAGE) /
+                    devicesData.gpus[0].gpu_memory_total
+                  ).toFixed(2)
+                )
+              });
+            }
+          }
+        })
+        .catch(() => {
+          setResources({});
+        });
+    }, LONG_POLL_INTERVAL);
+    return () => {
+      clearInterval(intervalResource);
+      clearInterval(interval);
+    };
   }, []);
 
   function handleEventDownloadClick() {
@@ -60,6 +101,19 @@ function Footer({ agent, exportEvent, history }) {
     }
     dispatch(resetDownloaderState());
     setShowExportComponent(false);
+  }
+
+  function renderColorResource(value) {
+    if (value <= 50) {
+      return theme.white;
+    }
+    if (value <= 80) {
+      return theme.yellow;
+    }
+    if (value <= 100) {
+      return theme.inlineError;
+    }
+    return theme.white;
   }
 
   useEffect(() => {
@@ -118,19 +172,7 @@ function Footer({ agent, exportEvent, history }) {
 
   return (
     <Wrapper>
-      <Right>
-        <ButtonWrapper>
-          {menu.map(item => (
-            <LinkButton
-              key={item.label}
-              id={item.label}
-              onClick={() => history.push(item.url)}
-            >
-              <span>{item.label}</span>
-            </LinkButton>
-          ))}
-        </ButtonWrapper>
-      </Right>
+      <Right></Right>
       <Left>
         {showExportComponent && (
           <ButtonWrapper show={showButton}>
@@ -175,6 +217,18 @@ function Footer({ agent, exportEvent, history }) {
             Coordinator Status: <span>{agentStatus}</span>
           </CoordinatorStatus>
         )}
+        <ResourceStatusWrapper withChild={Object.keys(resources).length > 0}>
+          {Object.keys(resources).length > 0 &&
+            Object.keys(resources).map(key => (
+              <ResourceItem
+                color={renderColorResource(Number(resources[key]))}
+                key={key}
+              >
+                <span>{key.replace("_", " ").toUpperCase()}</span>
+                <span className="value"> {resources[key]}%</span>
+              </ResourceItem>
+            ))}
+        </ResourceStatusWrapper>
       </Left>
     </Wrapper>
   );
@@ -199,7 +253,13 @@ const Right = styled.div`
   height: 100%;
   margin-left: 5px;
 `;
-const Left = styled.div``;
+const Left = styled.div`
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+`;
 
 const slideIn = keyframes`
   0% {
@@ -247,8 +307,42 @@ const ButtonWrapper = styled.div`
 `;
 
 const CoordinatorStatus = styled.div`
-  padding: 0 20px;
+  padding: 0 10px;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
   span {
     color: ${props => props.spanColor};
+  }
+`;
+
+const ResourceStatusWrapper = styled.div`
+  height: 100%;
+  max-height: 100%;
+  display: grid;
+  flex-direction: row;
+  grid-template-columns: auto auto;
+  font-size: 13px;
+  padding-top: 10px;
+  column-gap: 10px;
+  ${props =>
+    props.withChild &&
+    `
+    border-left: 1px solid #372463;
+    margin-right: 20px;
+    padding-left: 10px;
+  `}
+`;
+
+const ResourceItem = styled.div`
+  flex-direction: row;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0px 5px;
+  .value {
+    color: ${props => props.color};
   }
 `;

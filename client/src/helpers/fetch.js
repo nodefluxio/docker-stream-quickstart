@@ -41,6 +41,14 @@ const fetch = async (url, method, data, responseType, token) => {
     ...Header
   };
 
+  axios.interceptors.response.use(
+    response =>
+      response.headers["content-type"] !== "text/html; charset=utf-8"
+        ? response
+        : Promise.reject(response),
+    error => Promise.reject(error)
+  );
+
   const reqData = await axios(options);
   await checkStatus(reqData);
   const result = reqData.data;

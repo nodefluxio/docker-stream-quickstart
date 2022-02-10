@@ -48,6 +48,9 @@ func (p *psqlEnrolledFaceRepo) GetAll(ctx context.Context) ([]*entity.EnrolledFa
 	var data []*entity.EnrolledFace
 
 	err := p.Conn.Find(&data).Error
+	if err != nil {
+		return nil, err
+	}
 	return data, err
 }
 func (p *psqlEnrolledFaceRepo) DeleteAll(ctx context.Context) error {
@@ -99,6 +102,9 @@ func (p *psqlEnrolledFaceRepo) GetList(ctx context.Context, paging *util.Paginat
 	}
 
 	err := tx.Find(&data).Error
+	if err != nil {
+		return nil, err
+	}
 	return data, err
 }
 
@@ -114,11 +120,17 @@ func (p *psqlEnrolledFaceRepo) Count(ctx context.Context, paging *util.Paginatio
 func (p *psqlEnrolledFaceRepo) GetDetail(ctx context.Context, ID uint64) (*entity.EnrolledFace, error) {
 	object := &entity.EnrolledFace{}
 	err := p.Conn.First(object, ID).Error
+	if err != nil {
+		return nil, err
+	}
 	return object, err
 }
 
 func (p *psqlEnrolledFaceRepo) GetDetailwFaceID(ctx context.Context, faceID uint64) (*entity.EnrolledFaceWithImage, error) {
 	object := &entity.EnrolledFaceWithImage{}
 	err := p.Conn.Select("enrolled_face.*, face_image.image_thumbnail as image").Table("enrolled_face").Joins("INNER JOIN face_image on face_image.enrolled_face_id = enrolled_face.id").Where("enrolled_face.deleted_at is NULL AND enrolled_face.face_id= ?", faceID).Order("enrolled_face ASC").Limit(1).Scan(&object).Error
+	if err != nil {
+		return nil, err
+	}
 	return object, err
 }

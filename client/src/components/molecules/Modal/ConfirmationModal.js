@@ -81,7 +81,7 @@ export default function ConfirmationModal(props) {
             id="confirmation_button"
             width="100%"
             onClick={onConfirm}
-            disabled={code !== input}
+            disabled={withCode ? code !== input : false}
             isLoading={isLoading}
           >
             {buttonTitle}

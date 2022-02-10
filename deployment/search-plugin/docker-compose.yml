@@ -1,0 +1,25 @@
+version: "3"
+services:
+  vanilla-dasboard:
+    container_name: vanilla-dashboard
+    image: registry.gitlab.com/nodefluxio/vanilla-dashboard:searching-polri-alpha7
+    command: ./vanend --visionaire-host 192.168.101.248:4004 --website-host 192.168.101.248
+    network_mode: "host"
+    environment:
+    - PLUGIN_HOST= http://192.168.101.248:8081
+    - PLUGIN_NAME= Search
+  search-plugin:
+    container_name: search-plugin
+    image: registry.gitlab.com/nodefluxio/vanilla-dashboard/search:searching-polri-alpha7
+    ports:
+    - 8081:80
+    environment:
+    - NODE_ENV=production
+    - ENV_DEST=/
+    - SERVER_API=http://192.168.101.248:6014
+  search-plugin-api:
+    container_name: search-plugin-api
+    image: registry.gitlab.com/nodefluxio/vanilla-dashboard:searching-polri-alpha7
+    command: ./searchingpolri --seagate-base-url http://192.168.101.248:3003 --polri-base-url http://192.168.101.248:3003 --fremisn-url http://192.168.101.248:4005/v1/face
+    ports:
+    - 6014:6014

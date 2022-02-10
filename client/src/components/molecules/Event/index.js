@@ -1,4 +1,5 @@
-import React, { Fragment, useContext } from "react";
+import React, { useContext } from "react";
+import { ContextMenuTrigger } from "react-contextmenu";
 import Styled, { ThemeContext } from "styled-components";
 import PropTypes from "prop-types";
 import Row from "components/atoms/Row";
@@ -13,7 +14,8 @@ const defaultProps = {
   pinfunc: null,
   color: "white",
   result: "",
-  location: ""
+  location: "",
+  onContextMenu: () => {}
 };
 
 const propTypes = {
@@ -27,7 +29,8 @@ const propTypes = {
   rightOption: PropTypes.element,
   pinned: PropTypes.bool,
   pinfunc: PropTypes.func,
-  onEnlargePrimaryImage: PropTypes.func
+  onEnlargePrimaryImage: PropTypes.func,
+  onContextMenu: PropTypes.func
 };
 
 function Event(props) {
@@ -42,12 +45,13 @@ function Event(props) {
     rightOption,
     pinned,
     pinfunc,
-    onEnlargePrimaryImage
+    onEnlargePrimaryImage,
+    onContextMenu
   } = props;
   const themeContext = useContext(ThemeContext);
   return (
-    <Fragment>
-      <CardList highlight={pinfunc && pinned}>
+    <ContextMenuTrigger id="event-context">
+      <CardList highlight={pinfunc && pinned} onContextMenu={onContextMenu}>
         <Row align="center" horizontalGap={5}>
           <Row>
             <BorderContent
@@ -119,7 +123,7 @@ function Event(props) {
         </Row>
         {rightOption}
       </CardList>
-    </Fragment>
+    </ContextMenuTrigger>
   );
 }
 

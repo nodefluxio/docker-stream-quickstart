@@ -3,6 +3,7 @@
 /* eslint-disable consistent-return */
 import React from "react";
 import PropTypes from "prop-types";
+import { connect } from "react-redux";
 
 function loadComponent(scope, module) {
   return async () => {
@@ -61,7 +62,7 @@ const useDynamicScript = args => {
   };
 };
 
-export default function Plugin(props) {
+function Plugin(props) {
   const { ready, failed } = useDynamicScript({
     url: props.system && props.system.url
   });
@@ -84,12 +85,21 @@ export default function Plugin(props) {
 
   return (
     <React.Suspense fallback="Loading System">
-      <Component {...props} />
+      <Component {...props} store={props.store} />
     </React.Suspense>
   );
 }
 
 Plugin.propTypes = {
   system: PropTypes.object.isRequired,
-  componentProps: PropTypes.object
+  componentProps: PropTypes.object,
+  store: PropTypes.object.isRequired
 };
+
+function mapStateToProps(state) {
+  return {
+    store: state
+  };
+}
+
+export default connect(mapStateToProps)(Plugin);

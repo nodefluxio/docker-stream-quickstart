@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	b64 "encoding/base64"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"image"
@@ -17,6 +18,7 @@ import (
 	"gitlab.com/nodefluxio/vanilla-dashboard/internal/entity"
 	"gitlab.com/nodefluxio/vanilla-dashboard/internal/pkg/imageprocessing"
 	"gitlab.com/nodefluxio/vanilla-dashboard/internal/pkg/util"
+	"gitlab.com/nodefluxio/vanilla-dashboard/internal/pkg/zipper"
 	"gitlab.com/nodefluxio/vanilla-dashboard/internal/presenter"
 	"gitlab.com/nodefluxio/vanilla-dashboard/internal/repository"
 )
@@ -38,6 +40,7 @@ const (
 	size              = 1000
 	sizeForAspecRatio = 0 // 0 for maintain aspec ratio
 	resolutionDivider = 2
+	dateLayout        = "2006-01-02"
 )
 
 // GetList for get all data enrollment with paging
@@ -63,7 +66,7 @@ func (s *ServiceImpl) GetList(ctx context.Context, paging *util.Pagination) (*pr
 	}
 	output := make([]*presenter.EnrollmentResponse, 0)
 	for _, enrollment := range enrolledFace {
-		faces, err := s.FaceImageRepo.GetDetailByEnrollID(ctx, enrollment.ID)
+		faces, err := s.FaceImageRepo.GetDetailWithoutImgByEnrollID(ctx, enrollment.ID)
 		if err != nil {
 			logutil.LogObj.SetErrorLog(map[string]interface{}{
 				"enrollment_id": enrollment.ID,
@@ -76,6 +79,9 @@ func (s *ServiceImpl) GetList(ctx context.Context, paging *util.Pagination) (*pr
 			ID:             enrollment.ID,
 			Name:           enrollment.Name,
 			IdentityNumber: enrollment.IdentityNumber,
+			Gender:         enrollment.Gender,
+			BirthPlace:     enrollment.BirthPlace,
+			BirthDate:      enrollment.BirthDate.Format(dateLayout),
 			Status:         enrollment.Status,
 			FaceID:         enrollment.FaceID,
 			CreatedAt:      enrollment.CreatedAt,
@@ -108,6 +114,22 @@ func (s *ServiceImpl) deleteFremisFaceVariation(ctx context.Context, faceID stri
 
 func (s *ServiceImpl) reEnrollFremis(ctx context.Context, enrolledFaceID uint64, faceID string) error {
 	faceImages, err := s.FaceImageRepo.GetDetailByEnrollID(ctx, enrolledFaceID)
+	if err != nil {
+		return err
+	}
+	for _, faceImage := range faceImages {
+		sEnc := b64.StdEncoding.EncodeToString([]byte(faceImage.Image))
+		_, err := s.FRemisRepo.AddFaceVariation(ctx, faceID, sEnc)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *ServiceImpl) reEnrollFremisVariation(ctx context.Context, faceID string, variations []string) error {
+	logutil.LogObj.SetInfoLog(map[string]interface{}{"face_id": faceID, "variations": variations}, "reEnroll fremis face variations, because error happen at enrollment process")
+	faceImages, err := s.FaceImageRepo.GetDetailByVariations(ctx, variations)
 	if err != nil {
 		return err
 	}
@@ -251,7 +273,16 @@ func (s *ServiceImpl) Create(ctx context.Context, postData *presenter.Enrollment
 	var variation string
 	var enrolledData *entity.EnrolledFace
 	var images []string
+
 	faces := make([]*entity.FaceImage, 0)
+	birthDate, err := time.Parse(dateLayout, postData.BirthDate)
+	if err != nil && postData.BirthDate != "" {
+		logutil.LogObj.SetErrorLog(map[string]interface{}{
+			"err": err,
+		},
+			"wrong format birth date")
+		return nil, errors.New("wrong format birth date, pelase use this format " + dateLayout)
+	}
 
 	// check if this system use CES or not, if use we must check ces service avaibility
 	if s.UseCES == "true" && isAgent != "true" {
@@ -264,11 +295,14 @@ func (s *ServiceImpl) Create(ctx context.Context, postData *presenter.Enrollment
 			return nil, errors.New("failed ping CES agent CUD opration disabled")
 		}
 	}
+
 	// init database transaction
 	tx := s.PsqlTransactionRepo.BeginTransaction(ctx)
+	logutil.LogObj.SetInfoLog(map[string]interface{}{}, "begin database transction")
 
 	// iterate image for enroll to FREMIS and save to database
 	for i, v := range postData.Images {
+		logutil.LogObj.SetInfoLog(map[string]interface{}{}, "begin prepare image")
 		newImg, err := s.prepareImage(ctx, v.Image)
 		if err != nil {
 			s.PsqlTransactionRepo.RollbackTransaction(ctx, tx)
@@ -283,7 +317,6 @@ func (s *ServiceImpl) Create(ctx context.Context, postData *presenter.Enrollment
 		}
 
 		sEnc := b64.StdEncoding.EncodeToString(newImg)
-		// fmt.Println(sEnc)
 		images = append(images, sEnc)
 		// first image is will be to enroll first for get face id and save
 		// data image to enrolled face table for get enrollment id
@@ -294,8 +327,10 @@ func (s *ServiceImpl) Create(ctx context.Context, postData *presenter.Enrollment
 
 			// check user custom face enrollment or not for enroll face to fremis
 			if postData.FaceID != "" {
+				logutil.LogObj.SetInfoLog(map[string]interface{}{}, "begin fremis enrollment")
 				enrollmentData, err = s.FRemisRepo.AddFaceVariation(ctx, postData.FaceID, sEnc)
 			} else {
+				logutil.LogObj.SetInfoLog(map[string]interface{}{}, "begin fremise add variation")
 				enrollmentData, err = s.FRemisRepo.FaceEnrollment(ctx, sEnc)
 			}
 
@@ -304,6 +339,7 @@ func (s *ServiceImpl) Create(ctx context.Context, postData *presenter.Enrollment
 					"err": err,
 				},
 					"error on when insert to Fremis Repo")
+				s.PsqlTransactionRepo.RollbackTransaction(ctx, tx)
 				return nil, err
 			}
 			logutil.LogObj.SetInfoLog(map[string]interface{}{"time_elapsed": fmt.Sprintf("%f Second", time.Since(startFaceEnroll).Seconds())}, "fremis face erollment time elapsed")
@@ -318,6 +354,9 @@ func (s *ServiceImpl) Create(ctx context.Context, postData *presenter.Enrollment
 				FaceID:         faceIDFormat,
 				Name:           postData.Name,
 				IdentityNumber: postData.IdentityNumber,
+				Gender:         postData.Gender,
+				BirthPlace:     postData.BirthPlace,
+				BirthDate:      birthDate,
 				Status:         postData.Status,
 			})
 			if err != nil {
@@ -351,6 +390,8 @@ func (s *ServiceImpl) Create(ctx context.Context, postData *presenter.Enrollment
 		}
 
 		// pre proccess image to create thumbnail before save image to database face image
+		logutil.LogObj.SetInfoLog(map[string]interface{}{}, "begin create thumbnail image")
+
 		image, _, err := image.Decode(bytes.NewReader(newImg))
 		if err != nil {
 			s.PsqlTransactionRepo.RollbackTransaction(ctx, tx)
@@ -410,6 +451,9 @@ func (s *ServiceImpl) Create(ctx context.Context, postData *presenter.Enrollment
 				FaceID:         faceIDFormat,
 				Name:           postData.Name,
 				IdentityNumber: postData.IdentityNumber,
+				Gender:         postData.Gender,
+				BirthPlace:     postData.BirthPlace,
+				BirthDate:      birthDate,
 				Status:         postData.Status,
 			},
 		}
@@ -428,11 +472,13 @@ func (s *ServiceImpl) Create(ctx context.Context, postData *presenter.Enrollment
 	} else {
 		s.PsqlTransactionRepo.CommitTransaction(ctx, tx)
 	}
-
 	return &presenter.EnrollmentResponse{
 		ID:             enrolledData.ID,
 		Name:           enrolledData.Name,
 		IdentityNumber: enrolledData.IdentityNumber,
+		Gender:         enrolledData.Gender,
+		BirthPlace:     enrolledData.BirthPlace,
+		BirthDate:      enrolledData.BirthDate.Format(dateLayout),
 		Status:         enrolledData.Status,
 		FaceID:         enrolledData.FaceID,
 		CreatedAt:      enrolledData.CreatedAt,
@@ -442,8 +488,17 @@ func (s *ServiceImpl) Create(ctx context.Context, postData *presenter.Enrollment
 	}, nil
 }
 
-// Update is function for add enrollment
+// Update is function for update data face enrollment
 func (s *ServiceImpl) Update(ctx context.Context, enrollmentID uint64, postData *presenter.EnrollmentRequest, isAgent string) error {
+	birthDate, err := time.Parse(dateLayout, postData.BirthDate)
+	if err != nil {
+		logutil.LogObj.SetErrorLog(map[string]interface{}{
+			"err": err,
+		},
+			"wrong format birth date")
+		return errors.New("wrong format birth date, pelase use this format " + dateLayout)
+	}
+
 	if s.UseCES == "true" && isAgent != "true" {
 		err := s.AgentRepo.Ping(ctx)
 		if err != nil {
@@ -466,6 +521,9 @@ func (s *ServiceImpl) Update(ctx context.Context, enrollmentID uint64, postData 
 		ID:             enrollmentID,
 		Name:           postData.Name,
 		IdentityNumber: postData.IdentityNumber,
+		Gender:         postData.Gender,
+		BirthPlace:     postData.BirthPlace,
+		BirthDate:      birthDate,
 		Status:         postData.Status,
 		FaceID:         detailEnroll.FaceID,
 	})
@@ -475,6 +533,27 @@ func (s *ServiceImpl) Update(ctx context.Context, enrollmentID uint64, postData 
 		},
 			"error on update enrolled face")
 		return err
+	}
+
+	if len(postData.DeletedVariations) > 0 {
+		tx, err = s.FaceImageRepo.DeleteVariation(ctx, tx, postData.DeletedVariations)
+		if err != nil {
+			s.PsqlTransactionRepo.RollbackTransaction(ctx, tx)
+			logutil.LogObj.SetErrorLog(map[string]interface{}{
+				"err": err,
+			},
+				"error delete face variation")
+			return err
+		}
+
+		err = s.FRemisRepo.DeleteFaceVariation(ctx, faceID, postData.DeletedVariations)
+		if err != nil {
+			logutil.LogObj.SetErrorLog(map[string]interface{}{
+				"err": err,
+			},
+				"error delete face variation from fremis")
+			return err
+		}
 	}
 
 	var images []string
@@ -504,6 +583,10 @@ func (s *ServiceImpl) Update(ctx context.Context, enrollmentID uint64, postData 
 			if len(variations) > 0 {
 				s.deleteFremisFaceVariation(ctx, faceID, variations)
 			}
+
+			if len(postData.DeletedVariations) > 0 {
+				s.reEnrollFremisVariation(ctx, faceID, postData.DeletedVariations)
+			}
 			logutil.LogObj.SetErrorLog(map[string]interface{}{
 				"err": err,
 			},
@@ -518,6 +601,9 @@ func (s *ServiceImpl) Update(ctx context.Context, enrollmentID uint64, postData 
 		if err != nil {
 			s.PsqlTransactionRepo.RollbackTransaction(ctx, tx)
 			s.deleteFremisFaceVariation(ctx, faceID, variations)
+			if len(postData.DeletedVariations) > 0 {
+				s.reEnrollFremisVariation(ctx, faceID, postData.DeletedVariations)
+			}
 			logutil.LogObj.SetErrorLog(map[string]interface{}{
 				"err": err,
 			},
@@ -531,6 +617,9 @@ func (s *ServiceImpl) Update(ctx context.Context, enrollmentID uint64, postData 
 		if err != nil {
 			s.PsqlTransactionRepo.RollbackTransaction(ctx, tx)
 			s.deleteFremisFaceVariation(ctx, faceID, variations)
+			if len(postData.DeletedVariations) > 0 {
+				s.reEnrollFremisVariation(ctx, faceID, postData.DeletedVariations)
+			}
 			logutil.LogObj.SetErrorLog(map[string]interface{}{
 				"err": err,
 			},
@@ -548,6 +637,9 @@ func (s *ServiceImpl) Update(ctx context.Context, enrollmentID uint64, postData 
 		if err != nil {
 			s.PsqlTransactionRepo.RollbackTransaction(ctx, tx)
 			s.deleteFremisFaceVariation(ctx, faceID, variations)
+			if len(postData.DeletedVariations) > 0 {
+				s.reEnrollFremisVariation(ctx, faceID, postData.DeletedVariations)
+			}
 			logutil.LogObj.SetErrorLog(map[string]interface{}{
 				"err": err,
 			},
@@ -564,6 +656,9 @@ func (s *ServiceImpl) Update(ctx context.Context, enrollmentID uint64, postData 
 				FaceID:         detailEnroll.FaceID,
 				Name:           postData.Name,
 				IdentityNumber: postData.IdentityNumber,
+				Gender:         postData.Gender,
+				BirthPlace:     postData.BirthPlace,
+				BirthDate:      birthDate,
 				Status:         postData.Status,
 			},
 		}
@@ -572,6 +667,9 @@ func (s *ServiceImpl) Update(ctx context.Context, enrollmentID uint64, postData 
 			s.PsqlTransactionRepo.RollbackTransaction(ctx, tx)
 			if len(variations) != 0 {
 				s.deleteFremisFaceVariation(ctx, faceID, variations)
+				if len(postData.DeletedVariations) > 0 {
+					s.reEnrollFremisVariation(ctx, faceID, postData.DeletedVariations)
+				}
 			}
 			logutil.LogObj.SetErrorLog(map[string]interface{}{
 				"err": err,
@@ -599,13 +697,13 @@ func (s *ServiceImpl) GetDetail(ctx context.Context, ID uint64) (*presenter.Enro
 			"error on when GetDetail repo")
 		return nil, err
 	}
-	faces, err := s.FaceImageRepo.GetDetailByEnrollID(ctx, ID)
+	faces, err := s.FaceImageRepo.GetDetailWithoutImgByEnrollID(ctx, ID)
 	if err != nil {
 		logutil.LogObj.SetErrorLog(map[string]interface{}{
 			"id":  ID,
 			"err": err,
 		},
-			"error on when GetDetailByEnrollID repo")
+			"error on when GetDetailWithoutImgByEnrollID repo")
 		return nil, err
 	}
 
@@ -614,6 +712,9 @@ func (s *ServiceImpl) GetDetail(ctx context.Context, ID uint64) (*presenter.Enro
 		Name:           enrolledData.Name,
 		FaceID:         enrolledData.FaceID,
 		IdentityNumber: enrolledData.IdentityNumber,
+		Gender:         enrolledData.Gender,
+		BirthPlace:     enrolledData.BirthPlace,
+		BirthDate:      enrolledData.BirthDate.Format(dateLayout),
 		Status:         enrolledData.Status,
 		CreatedAt:      enrolledData.CreatedAt,
 		UpdatedAt:      enrolledData.UpdatedAt,
@@ -622,7 +723,7 @@ func (s *ServiceImpl) GetDetail(ctx context.Context, ID uint64) (*presenter.Enro
 	}, nil
 }
 
-// Delete Face ID
+// Delete is function for delete 1 face enrollment
 func (s *ServiceImpl) Delete(ctx context.Context, ID uint64, isAgent string) error {
 	if s.UseCES == "true" && isAgent != "true" {
 		err := s.AgentRepo.Ping(ctx)
@@ -709,7 +810,7 @@ func (s *ServiceImpl) Delete(ctx context.Context, ID uint64, isAgent string) err
 	return nil
 }
 
-// Delete Face ID
+// DeleteAll is use case for delete all data face enrollment
 func (s *ServiceImpl) DeleteAll(ctx context.Context) error {
 	objs, errGetDetail := s.EnrolledFaceRepo.GetAll(ctx)
 	if errGetDetail != nil {
@@ -766,4 +867,71 @@ func (s *ServiceImpl) GetFaceImage(ctx context.Context, ID uint64) ([]byte, erro
 		return nil, err
 	}
 	return getFace.ImageThumbnail, nil
+}
+
+// Backup is usecase for generate data backup face enrollment
+func (s *ServiceImpl) Backup(ctx context.Context) (*os.File, error) {
+	enrolledFaces, err := s.EnrolledFaceRepo.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	mainDir := fmt.Sprintf("data_%s", time.Now().Format("2006-01-02"))
+	err = os.MkdirAll(mainDir, 0755)
+	if err != nil {
+		return nil, err
+	}
+	fileName := fmt.Sprintf("%s/face_enrollment_%s.csv", mainDir, time.Now().Format("2006-01-02"))
+	csvFile, err := os.Create(fileName)
+	if err != nil {
+		return nil, err
+	}
+	writer := csv.NewWriter(csvFile)
+	err = writer.Write([]string{"identity_number", "name", "status", "foldername"})
+	if err != nil {
+		return nil, err
+	}
+	writer.Flush()
+	filesToBeZip := []string{}
+	jpegFaces := []*os.File{}
+	for _, val := range enrolledFaces {
+		folderName := fmt.Sprintf("%s", val.Name)
+		faces, err := s.FaceImageRepo.GetDetailByEnrollID(ctx, val.ID)
+		for _, face := range faces {
+			// create image directory
+			dirName := fmt.Sprintf("%s", val.Name)
+			err := os.MkdirAll(mainDir+"/"+dirName, 0755)
+			if err != nil {
+				return nil, err
+			}
+			// write jpeg file
+			jpegFileName := fmt.Sprintf("%s/%s/%s_%v", mainDir, dirName, val.Name, face.ID)
+			jpegFile, err := face.WriteToJpeg(ctx, jpegFileName)
+			if err != nil {
+				return nil, err
+			}
+			filesToBeZip = append(filesToBeZip, jpegFile.Name())
+			jpegFaces = append(jpegFaces, jpegFile)
+		}
+		if err != nil {
+			return nil, err
+		}
+		err = writer.Write([]string{val.IdentityNumber, val.Name, val.Status, folderName})
+		if err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+
+	err = csvFile.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	appZipper := zipper.NewZipper()
+	zippedFile, err := appZipper.Create(ctx, mainDir, fmt.Sprintf("%s.zip", mainDir))
+	if err != nil {
+		return nil, err
+	}
+
+	return zippedFile, nil
 }

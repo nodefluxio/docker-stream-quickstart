@@ -8,5 +8,6 @@ import (
 
 // Stream interface abstracts the repository layer and should be implemented in repository
 type Stream interface {
-	GetDetail(ctx context.Context, nodeNumber int64, streamID string) (*entity.StreamDetail, error)
+	GetDetail(ctx context.Context, nodeNumber int64, streamID string) (*entity.VisionaireStreamDetail, error)
+	GetList(ctx context.Context) (*entity.VisionaireStream, error)
 }

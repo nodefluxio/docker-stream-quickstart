@@ -2,6 +2,7 @@ package enrollment
 
 import (
 	"context"
+	"os"
 
 	"gitlab.com/nodefluxio/vanilla-dashboard/internal/pkg/util"
 	"gitlab.com/nodefluxio/vanilla-dashboard/internal/presenter"
@@ -16,4 +17,5 @@ type Service interface {
 	DeleteAll(ctx context.Context) error
 	GetDetail(ctx context.Context, ID uint64) (*presenter.EnrollmentResponse, error)
 	GetFaceImage(ctx context.Context, ID uint64) ([]byte, error)
+	Backup(ctx context.Context) (*os.File, error)
 }

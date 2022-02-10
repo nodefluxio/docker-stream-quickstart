@@ -1,3 +1,5 @@
+/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-await-in-loop */
 import React, { useState, useEffect } from "react";
 import Styled from "styled-components";
 import PropTypes from "prop-types";
@@ -51,7 +53,7 @@ function BatchEnrollment(props) {
     setValueFolder(newPath);
   }
 
-  function proccessBatchEnroll() {
+  async function proccessBatchEnroll() {
     setProcessStart(performance.now());
     setLog([]);
     setShowLog(true);
@@ -79,7 +81,7 @@ function BatchEnrollment(props) {
     };
     setLog(value => [...value, message]);
 
-    listEnrollment.forEach(x => {
+    for (const x of listEnrollment) {
       const newForm = new FormData();
       const identityNumber = x[0];
       const name = x[1];
@@ -93,36 +95,35 @@ function BatchEnrollment(props) {
       const imageField = dataImages.filter(j => j.folder_name === folderName);
       imageField.map(image => newForm.append("images", image.blob));
 
-      createEnrollment(newForm)
-        .then(result => {
-          if (result.ok) {
-            const messageSuccess = {
-              message: `${identityNumber}@${name} -- Enrollment is success`,
-              type: "success"
-            };
-            setLog(value => [...value, messageSuccess]);
-            setProcessedImgSuccess(value => value + 1);
-            setProcessedImg(value => value + 1);
-          } else {
-            const messageFailed = {
-              message: `${identityNumber}@${name} -- Enrollment is failed with error -- ${result.message}`,
-              type: "error"
-            };
-            setLog(value => [...value, messageFailed]);
-            setProcessedImg(value => value + 1);
-          }
-        })
-        .catch(err => {
-          const response = err.response.data;
-          const errorMsg = response.errors[0] || response.message;
+      try {
+        const createEnroll = await createEnrollment(newForm);
+        if (createEnroll.ok) {
+          const messageSuccess = {
+            message: `${identityNumber}@${name} -- Enrollment is success`,
+            type: "success"
+          };
+          setLog(value => [...value, messageSuccess]);
+          setProcessedImgSuccess(value => value + 1);
+          setProcessedImg(value => value + 1);
+        } else {
           const messageFailed = {
-            message: `${identityNumber}@${name} -- Enrollment is failed with error -- ${errorMsg}`,
+            message: `${identityNumber}@${name} -- Enrollment is failed with error -- ${createEnroll.message}`,
             type: "error"
           };
           setLog(value => [...value, messageFailed]);
           setProcessedImg(value => value + 1);
-        });
-    });
+        }
+      } catch (err) {
+        const response = err.response.data;
+        const errorMsg = response.errors[0] || response.message;
+        const messageFailed = {
+          message: `${identityNumber}@${name} -- Enrollment is failed with error -- ${errorMsg}`,
+          type: "error"
+        };
+        setLog(value => [...value, messageFailed]);
+        setProcessedImg(value => value + 1);
+      }
+    }
   }
 
   function downloadLog() {
@@ -321,7 +322,7 @@ const Logger = Styled.li`
 BatchEnrollment.propTypes = {
   openModal: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
-  data: PropTypes.array.isRequired
+  data: PropTypes.oneOfType([PropTypes.array, PropTypes.object])
 };
 
 export default BatchEnrollment;

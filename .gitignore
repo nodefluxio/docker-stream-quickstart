@@ -24,3 +24,4 @@ env.js
 public/env.js
 .env.generated
 tmp
+data_*

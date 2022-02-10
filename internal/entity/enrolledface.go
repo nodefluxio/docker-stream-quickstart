@@ -8,6 +8,9 @@ type EnrolledFace struct {
 	FaceID         uint64     `json:"face_id" db:"face_id"`
 	Name           string     `json:"name" db:"name"`
 	IdentityNumber string     `json:"identity_number" db:"identity_number"`
+	Gender         string     `json:"gender" db:"gender"`
+	BirthPlace     string     `json:"birth_place" db:"birth_place"`
+	BirthDate      time.Time  `json:"birth_date" db:"birth_date"`
 	Status         string     `json:"status" db:"status"`
 	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt      *time.Time `json:"updated_at" db:"updated_at"`
